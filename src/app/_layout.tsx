@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/data/AuthProvider';
 import { DataProvider } from '@/data/DataProvider';
+import { isFirebaseConfigured } from '@/lib/firebase';
 import { Loading } from '@/ui/components';
-import { colors } from '@/ui/theme';
+import { colors, spacing } from '@/ui/theme';
 
 function RootNavigator() {
   const { user, initializing } = useAuth();
@@ -42,7 +44,20 @@ function RootNavigator() {
   );
 }
 
+/** デプロイ先に Firebase の設定値（環境変数）が入っていないとき */
+function SetupRequired() {
+  return (
+    <View style={styles.setup}>
+      <Text style={styles.setupTitle}>Firebase の設定が必要です</Text>
+      <Text style={styles.setupText}>
+        環境変数 EXPO_PUBLIC_FIREBASE_API_KEY などを設定してからビルドしてください。手順は README.md にあります。
+      </Text>
+    </View>
+  );
+}
+
 export default function RootLayout() {
+  if (!isFirebaseConfigured) return <SetupRequired />;
   return (
     <AuthProvider>
       <StatusBar style="dark" />
@@ -50,3 +65,9 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  setup: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
+  setupTitle: { fontSize: 20, fontWeight: '700', color: colors.text },
+  setupText: { fontSize: 14, color: colors.subText, textAlign: 'center', maxWidth: 420, lineHeight: 21 },
+});

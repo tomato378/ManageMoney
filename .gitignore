@@ -40,8 +40,10 @@ yarn-error.*
 /ios
 /android
 
-# Firebase（各自のプロジェクトの設定ファイル。EAS では環境変数 GOOGLE_SERVICES_JSON で渡す）
-google-services.json
-GoogleService-Info.plist
+# Firebase エミュレータのログ
 firebase-debug.log
 firestore-debug.log
+ui-debug.log
+
+# Vercel
+.vercel

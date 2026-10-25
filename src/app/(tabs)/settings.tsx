@@ -1,55 +1,45 @@
-import { signOut } from '@react-native-firebase/auth';
+import { signOut } from 'firebase/auth';
 import { router } from 'expo-router';
-import { Alert, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import { useAuth } from '@/data/AuthProvider';
 import { useData } from '@/data/DataProvider';
 import { runWrite, updateSettings } from '@/data/repo';
 import { auth } from '@/lib/firebase';
 import type { CategoryKind } from '@/types';
-import { saveWidgetSummary } from '@/widget/cache';
 import { Button, Card, Chip, ChipRow, IconBadge, Row, Screen, SectionTitle, TextLink } from '@/ui/components';
+import { confirmAsync, notify } from '@/ui/dialog';
 import { colors } from '@/ui/theme';
 
-const MAX_WIDGET_BUTTONS = 4;
+const MAX_QUICK_BUTTONS = 4;
 
 export default function SettingsScreen() {
   const { user } = useAuth();
   const { uid, categories, accounts, settings } = useData();
   const expenseCategories = categories.filter((c) => c.kind === 'expense');
 
-  function toggleWidgetCategory(id: string) {
-    const current = settings.widgetCategoryIds;
+  function toggleQuickCategory(id: string) {
+    const current = settings.quickCategoryIds;
     if (current.includes(id)) {
-      runWrite(updateSettings(uid, { widgetCategoryIds: current.filter((c) => c !== id) }));
-    } else if (current.length >= MAX_WIDGET_BUTTONS) {
-      Alert.alert(`ウィジェットに置けるのは${MAX_WIDGET_BUTTONS}つまでです`, 'どれかを外してから選んでください');
+      runWrite(updateSettings(uid, { quickCategoryIds: current.filter((c) => c !== id) }));
+    } else if (current.length >= MAX_QUICK_BUTTONS) {
+      notify(`クイック入力に置けるのは${MAX_QUICK_BUTTONS}つまでです`, 'どれかを外してから選んでください');
     } else {
-      runWrite(updateSettings(uid, { widgetCategoryIds: [...current, id] }));
+      runWrite(updateSettings(uid, { quickCategoryIds: [...current, id] }));
     }
   }
 
-  function logout() {
-    Alert.alert('ログアウトしますか？', undefined, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: 'ログアウト',
-        style: 'destructive',
-        onPress: async () => {
-          await saveWidgetSummary(null);
-          await signOut(auth);
-        },
-      },
-    ]);
+  async function logout() {
+    if (await confirmAsync('ログアウトしますか？')) await signOut(auth);
   }
 
   return (
     <Screen>
       <Card>
-        <SectionTitle title="ホーム画面ウィジェット" />
+        <SectionTitle title="ホームのクイック入力ボタン" />
         <Text style={styles.caption}>
-          ボタンに表示する支出カテゴリ（{settings.widgetCategoryIds.length}/{MAX_WIDGET_BUTTONS}）。ホーム画面を長押し →
-          「ウィジェット」→「ManageMoney クイック入力」で追加できます。
+          ホーム画面のボタンに出す支出カテゴリ（{settings.quickCategoryIds.length}/{MAX_QUICK_BUTTONS}
+          ）。押すとそのカテゴリを選んだ状態で入力画面が開きます。
         </Text>
         <ChipRow>
           {expenseCategories.map((c) => (
@@ -58,8 +48,8 @@ export default function SettingsScreen() {
               label={c.name}
               icon={c.icon}
               color={c.color}
-              selected={settings.widgetCategoryIds.includes(c.id)}
-              onPress={() => toggleWidgetCategory(c.id)}
+              selected={settings.quickCategoryIds.includes(c.id)}
+              onPress={() => toggleQuickCategory(c.id)}
             />
           ))}
         </ChipRow>

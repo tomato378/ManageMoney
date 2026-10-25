@@ -27,7 +27,7 @@ export const DEFAULT_ACCOUNT: Account = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  widgetCategoryIds: ['food', 'daily', 'transport', 'hobby'],
+  quickCategoryIds: ['food', 'daily', 'transport', 'hobby'],
   defaultAccountId: DEFAULT_ACCOUNT.id,
 };
 

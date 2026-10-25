@@ -1,6 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { archiveAccount, runWrite, saveAccount } from '@/data/repo';
@@ -8,6 +7,7 @@ import { ACCOUNT_TYPES } from '@/lib/defaults';
 import { parseAmount } from '@/lib/money';
 import type { AccountType } from '@/types';
 import { Button, Chip, ChipRow, Field, Input, Screen } from '@/ui/components';
+import { confirmAsync, notify } from '@/ui/dialog';
 
 export default function AccountEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,7 +20,7 @@ export default function AccountEditScreen() {
 
   function save() {
     if (!name.trim()) {
-      Alert.alert('口座名を入力してください');
+      notify('口座名を入力してください');
       return;
     }
     const balance = parseAmount(balanceText, { allowNegative: true }) ?? 0;
@@ -37,23 +37,15 @@ export default function AccountEditScreen() {
     router.back();
   }
 
-  function remove() {
+  async function remove() {
     if (!existing) return;
     if (existing.id === settings.defaultAccountId) {
-      Alert.alert('入力時のデフォルト口座は削除できません', '設定で別の口座に変えてから削除してください');
+      notify('入力時のデフォルト口座は削除できません', '設定で別の口座に変えてから削除してください');
       return;
     }
-    Alert.alert(`「${existing.name}」を削除しますか？`, '過去の取引は残ります。', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          runWrite(archiveAccount(uid, existing.id));
-          router.back();
-        },
-      },
-    ]);
+    if (!(await confirmAsync(`「${existing.name}」を削除しますか？`, '過去の取引は残ります。'))) return;
+    runWrite(archiveAccount(uid, existing.id));
+    router.back();
   }
 
   return (

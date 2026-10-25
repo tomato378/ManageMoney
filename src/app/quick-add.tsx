@@ -1,5 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { BackHandler } from 'react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 
 import { useData } from '@/data/DataProvider';
 import type { TransactionKind } from '@/types';
@@ -7,21 +6,17 @@ import { Loading, Screen } from '@/ui/components';
 import { emptyTransaction, TransactionForm } from '@/ui/TransactionForm';
 
 /**
- * ホーム画面ウィジェットのボタンから開く入力画面。
- * managemoney://quick-add?kind=expense&categoryId=food&from=widget
+ * ホームのクイック入力ボタンから開く入力画面。
+ * /quick-add?kind=expense&categoryId=food
  */
 export default function QuickAddScreen() {
-  const params = useLocalSearchParams<{ kind?: string; categoryId?: string; from?: string }>();
-  const { settings, loading } = useData();
+  const params = useLocalSearchParams<{ kind?: string; categoryId?: string }>();
+  const { settings, categories, loading } = useData();
   const kind: TransactionKind = params.kind === 'income' ? 'income' : 'expense';
+  const category = categories.find((c) => c.id === params.categoryId);
   const initial = { ...emptyTransaction(kind, settings.defaultAccountId), categoryId: params.categoryId ?? null };
 
   function done() {
-    if (params.from === 'widget') {
-      // 保存はローカルに即反映される。ウィジェットの再描画を待ってからホーム画面に戻る
-      setTimeout(() => BackHandler.exitApp(), 600);
-      return;
-    }
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }
@@ -31,6 +26,9 @@ export default function QuickAddScreen() {
 
   return (
     <Screen>
+      <Stack.Screen
+        options={{ title: category ? `${category.name}を入力` : kind === 'income' ? '収入を入力' : '支出を入力' }}
+      />
       <TransactionForm before={null} initial={initial} onDone={done} />
     </Screen>
   );

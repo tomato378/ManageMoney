@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { deleteCategory, runWrite, saveCategory, updateSettings } from '@/data/repo';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/lib/defaults';
 import type { CategoryKind } from '@/types';
 import { Button, Field, IconBadge, Input, Screen, type IconName } from '@/ui/components';
+import { confirmAsync, notify } from '@/ui/dialog';
 import { colors } from '@/ui/theme';
 
 export default function CategoryEditScreen() {
@@ -22,7 +23,7 @@ export default function CategoryEditScreen() {
 
   function save() {
     if (!name.trim()) {
-      Alert.alert('カテゴリ名を入力してください');
+      notify('カテゴリ名を入力してください');
       return;
     }
     runWrite(
@@ -38,24 +39,16 @@ export default function CategoryEditScreen() {
     router.back();
   }
 
-  function remove() {
+  async function remove() {
     if (!existing) return;
-    Alert.alert(`「${existing.name}」を削除しますか？`, '過去の取引は「未分類」として表示されます。', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          runWrite(deleteCategory(uid, existing.id));
-          if (settings.widgetCategoryIds.includes(existing.id)) {
-            runWrite(
-              updateSettings(uid, { widgetCategoryIds: settings.widgetCategoryIds.filter((id) => id !== existing.id) }),
-            );
-          }
-          router.back();
-        },
-      },
-    ]);
+    if (!(await confirmAsync(`「${existing.name}」を削除しますか？`, '過去の取引は「未分類」として表示されます。'))) {
+      return;
+    }
+    runWrite(deleteCategory(uid, existing.id));
+    if (settings.quickCategoryIds.includes(existing.id)) {
+      runWrite(updateSettings(uid, { quickCategoryIds: settings.quickCategoryIds.filter((id) => id !== existing.id) }));
+    }
+    router.back();
   }
 
   return (

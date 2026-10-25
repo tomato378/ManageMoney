@@ -9,7 +9,7 @@ import { expenseByCategory, summarizeTransactions } from '@/lib/calc';
 import { addMonths, formatDate, formatMonth } from '@/lib/date';
 import { formatYen } from '@/lib/money';
 import type { Account, Category, Transaction } from '@/types';
-import { Amount, Card, Empty, Fab, Loading, Screen, SectionTitle } from '@/ui/components';
+import { Amount, Card, CONTENT_MAX_WIDTH, Empty, Fab, Loading, Screen, SectionTitle } from '@/ui/components';
 import { TransactionRow } from '@/ui/rows';
 import { colors, spacing } from '@/ui/theme';
 
@@ -20,16 +20,18 @@ export default function TransactionsScreen() {
 
   return (
     <View style={styles.flex}>
-      <View style={styles.monthBar}>
-        <Pressable onPress={() => setMonth(addMonths(month, -1))} hitSlop={12} accessibilityLabel="前の月">
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </Pressable>
-        <Pressable onPress={() => setMonth(thisMonth)}>
-          <Text style={styles.monthText}>{formatMonth(month)}</Text>
-        </Pressable>
-        <Pressable onPress={() => setMonth(addMonths(month, 1))} hitSlop={12} accessibilityLabel="次の月">
-          <Ionicons name="chevron-forward" size={24} color={colors.text} />
-        </Pressable>
+      <View style={styles.monthBarOuter}>
+        <View style={styles.monthBar}>
+          <Pressable onPress={() => setMonth(addMonths(month, -1))} hitSlop={12} accessibilityLabel="前の月">
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+          <Pressable onPress={() => setMonth(thisMonth)}>
+            <Text style={styles.monthText}>{formatMonth(month)}</Text>
+          </Pressable>
+          <Pressable onPress={() => setMonth(addMonths(month, 1))} hitSlop={12} accessibilityLabel="次の月">
+            <Ionicons name="chevron-forward" size={24} color={colors.text} />
+          </Pressable>
+        </View>
       </View>
 
       {txs === null ? <Loading /> : <MonthDetail txs={txs} categories={categories} accounts={accounts} />}
@@ -126,15 +128,20 @@ function groupByDate(txs: Transaction[]): [string, Transaction[]][] {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
+  monthBarOuter: {
+    backgroundColor: colors.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   monthBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    backgroundColor: colors.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   monthText: { fontSize: 17, fontWeight: '700', color: colors.text },
   summaryRow: { flexDirection: 'row' },

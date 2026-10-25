@@ -1,13 +1,13 @@
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { deleteGoal, runWrite, saveGoal } from '@/data/repo';
-import { formatDate, fromDateString, toDateString, today } from '@/lib/date';
+import { today } from '@/lib/date';
 import { parseAmount } from '@/lib/money';
 import { Button, Chip, ChipRow, Field, Input, Screen } from '@/ui/components';
+import { DateInput } from '@/ui/DateInput';
+import { confirmAsync, notify } from '@/ui/dialog';
 
 export default function GoalEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,21 +20,10 @@ export default function GoalEditScreen() {
   const [accountId, setAccountId] = useState<string | null>(existing?.accountId ?? null);
   const [currentText, setCurrentText] = useState(existing ? String(existing.currentAmount) : '');
 
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: fromDateString(targetDate ?? today()),
-      mode: 'date',
-      minimumDate: new Date(),
-      onChange: (event, selected) => {
-        if (event.type === 'set' && selected) setTargetDate(toDateString(selected));
-      },
-    });
-  }
-
   function save() {
     const targetAmount = parseAmount(targetText);
     if (!name.trim() || !targetAmount) {
-      Alert.alert('目標の名前と金額を入力してください');
+      notify('目標の名前と金額を入力してください');
       return;
     }
     runWrite(
@@ -50,19 +39,10 @@ export default function GoalEditScreen() {
     router.back();
   }
 
-  function remove() {
-    if (!existing) return;
-    Alert.alert(`「${existing.name}」を削除しますか？`, undefined, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          runWrite(deleteGoal(uid, existing.id));
-          router.back();
-        },
-      },
-    ]);
+  async function remove() {
+    if (!existing || !(await confirmAsync(`「${existing.name}」を削除しますか？`))) return;
+    runWrite(deleteGoal(uid, existing.id));
+    router.back();
   }
 
   return (
@@ -74,10 +54,10 @@ export default function GoalEditScreen() {
       <Field label="目標額（円）">
         <Input value={targetText} onChangeText={setTargetText} keyboardType="number-pad" placeholder="例：300000" />
       </Field>
-      <Field label={`期日：${targetDate ? formatDate(targetDate) : 'なし'}`}>
+      <Field label="期日">
         <ChipRow>
           <Chip label="期日なし" selected={targetDate === null} onPress={() => setTargetDate(null)} />
-          <Chip label="日付を選ぶ" icon="calendar" selected={targetDate !== null} onPress={pickDate} />
+          <DateInput value={targetDate ?? ''} min={today()} onChange={setTargetDate} label="期日" />
         </ChipRow>
       </Field>
       <Field label="進捗の数え方">

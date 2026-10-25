@@ -1,11 +1,4 @@
-import {
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-  type DocumentSnapshot,
-  type QuerySnapshot,
-} from '@react-native-firebase/firestore';
+import { onSnapshot, orderBy, query, where, type DocumentSnapshot, type QuerySnapshot } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { activeAccounts, sortCategories } from '@/lib/calc';
@@ -13,8 +6,6 @@ import { currentMonth, monthRange } from '@/lib/date';
 import { DEFAULT_SETTINGS } from '@/lib/defaults';
 import { settingsDoc, userCollection, type UserCollection } from '@/lib/firebase';
 import type { Account, AppSettings, Budget, Category, Goal, Transaction } from '@/types';
-import { saveWidgetSummary } from '@/widget/cache';
-import { buildWidgetSummary } from '@/widget/summary';
 import { seedDefaultsIfNeeded } from './repo';
 
 interface DataState {
@@ -28,7 +19,7 @@ interface DataState {
   budgets: Budget[];
   goals: Goal[];
   settings: AppSettings;
-  /** 今月の取引（ホームとウィジェット用） */
+  /** 今月の取引（ホーム・予算用） */
   thisMonth: string;
   thisMonthTransactions: Transaction[];
   loading: boolean;
@@ -129,20 +120,6 @@ export function DataProvider({ uid, children }: { uid: string; children: ReactNo
       loading: !allAccounts || !rawCategories || !budgets || !goals || !settings || !thisMonthTransactions,
     };
   }, [uid, allAccounts, rawCategories, budgets, goals, settings, thisMonth, thisMonthTransactions]);
-
-  // データが変わるたびにホーム画面ウィジェットの表示を更新する
-  useEffect(() => {
-    if (value.loading) return;
-    saveWidgetSummary(
-      buildWidgetSummary({
-        month: value.thisMonth,
-        monthTxs: value.thisMonthTransactions,
-        budgets: value.budgets,
-        categories: value.categories,
-        settings: value.settings,
-      }),
-    ).catch((error) => console.warn('[widget]', error));
-  }, [value]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

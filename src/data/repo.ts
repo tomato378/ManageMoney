@@ -1,17 +1,9 @@
-import {
-  deleteDoc,
-  doc,
-  getDocFromServer,
-  increment,
-  setDoc,
-  updateDoc,
-  writeBatch,
-} from '@react-native-firebase/firestore';
-import { Alert } from 'react-native';
+import { deleteDoc, doc, getDocFromServer, increment, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 
 import { balanceDeltaDiff } from '@/lib/calc';
 import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from '@/lib/defaults';
 import { db, settingsDoc, userCollection, userDoc } from '@/lib/firebase';
+import { notify } from '@/ui/dialog';
 import {
   TOTAL_BUDGET_ID,
   type Account,
@@ -29,7 +21,7 @@ import {
  */
 export function runWrite(promise: Promise<unknown>) {
   promise.catch((error) => {
-    Alert.alert('保存できませんでした', String(error?.message ?? error));
+    notify('保存できませんでした', String(error?.message ?? error));
   });
 }
 

@@ -1,12 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { deleteBudget, runWrite, saveBudget } from '@/data/repo';
 import { parseAmount } from '@/lib/money';
 import { TOTAL_BUDGET_ID } from '@/types';
 import { Button, Chip, ChipRow, Field, Input, Screen } from '@/ui/components';
+import { notify } from '@/ui/dialog';
 
 export default function BudgetEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,11 +23,11 @@ export default function BudgetEditScreen() {
   function save() {
     const amount = parseAmount(amountText);
     if (!amount) {
-      Alert.alert('月の予算額を入力してください');
+      notify('月の予算額を入力してください');
       return;
     }
     if (taken.has(categoryId ?? TOTAL_BUDGET_ID)) {
-      Alert.alert('この対象の予算はすでにあります');
+      notify('この対象の予算はすでにあります');
       return;
     }
     // カテゴリを変えた場合は古い予算を消して付け替える

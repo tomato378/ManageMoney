@@ -1,4 +1,4 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+This is an Expo app that currently ships **only as a web app** (React Native Web, `expo export -p web`, hosted on Vercel). Use web-compatible APIs: `Alert` and native-only modules do not work on web — use `src/ui/dialog.ts` and the Firebase JS SDK. Keep layouts usable on both phone-width and desktop browsers.
 
 ## Expo has changed — do not trust your training data
 

@@ -11,11 +11,15 @@ import {
   type StyleProp,
   type TextInputProps,
   type ViewStyle,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatYen } from '@/lib/money';
 import { colors, radius, spacing } from './theme';
+
+/** PC の広い画面での本文の最大幅 */
+export const CONTENT_MAX_WIDTH = 640;
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -204,10 +208,13 @@ export function Button({
 
 export function Fab({ onPress, label = '追加' }: { onPress: () => void; label?: string }) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // 中央に寄せた本文の右下に置く
+  const right = Math.max(20, (width - CONTENT_MAX_WIDTH) / 2 + 20);
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 16, opacity: pressed ? 0.85 : 1 }]}
+      style={({ pressed }) => [styles.fab, { right, bottom: insets.bottom + 16, opacity: pressed ? 0.85 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={label}
     >
@@ -261,7 +268,14 @@ export function TextLink({ title, onPress }: { title: string; onPress: () => voi
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  screenContent: { padding: spacing.lg, gap: spacing.md },
+  // PC の広い画面でも読みやすい幅に収めて中央に寄せる
+  screenContent: {
+    padding: spacing.lg,
+    gap: spacing.md,
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   center: { alignItems: 'center', justifyContent: 'center' },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -302,7 +316,6 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 16, fontWeight: '700' },
   fab: {
     position: 'absolute',
-    right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,

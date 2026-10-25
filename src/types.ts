@@ -63,8 +63,8 @@ export interface Goal {
 }
 
 export interface AppSettings {
-  /** ウィジェットのボタンに出す支出カテゴリ（最大4つ） */
-  widgetCategoryIds: string[];
+  /** ホームのクイック入力ボタンに出す支出カテゴリ（最大4つ） */
+  quickCategoryIds: string[];
   /** 入力時に最初から選ばれている口座 */
   defaultAccountId: string | null;
 }

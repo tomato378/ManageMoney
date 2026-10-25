@@ -1,13 +1,14 @@
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { deleteTransaction, runWrite, saveTransaction } from '@/data/repo';
-import { addDays, formatDate, fromDateString, toDateString, today } from '@/lib/date';
+import { addDays, formatDate, today } from '@/lib/date';
 import { parseAmount } from '@/lib/money';
 import type { Transaction, TransactionInput, TransactionKind } from '@/types';
 import { Button, Card, Chip, ChipRow, Field, Input, Segmented } from './components';
+import { DateInput } from './DateInput';
+import { confirmAsync, notify } from './dialog';
 import { colors, spacing } from './theme';
 
 const KIND_OPTIONS: { value: TransactionKind; label: string; color: string }[] = [
@@ -54,11 +55,11 @@ export function TransactionForm({
   function save() {
     const amount = parseAmount(amountText);
     if (!amount) {
-      Alert.alert('金額を入力してください');
+      notify('金額を入力してください');
       return;
     }
     if (kind === 'transfer' && (!accountId || !toAccountId || accountId === toAccountId)) {
-      Alert.alert('振替元と振替先に別々の口座を選んでください');
+      notify('振替元と振替先に別々の口座を選んでください');
       return;
     }
     const input: TransactionInput = {
@@ -74,29 +75,10 @@ export function TransactionForm({
     onDone();
   }
 
-  function remove() {
-    if (!before) return;
-    Alert.alert('この取引を削除しますか？', undefined, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => {
-          runWrite(deleteTransaction(uid, before, accountIds));
-          onDone();
-        },
-      },
-    ]);
-  }
-
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: fromDateString(date),
-      mode: 'date',
-      onChange: (event, selected) => {
-        if (event.type === 'set' && selected) setDate(toDateString(selected));
-      },
-    });
+  async function remove() {
+    if (!before || !(await confirmAsync('この取引を削除しますか？'))) return;
+    runWrite(deleteTransaction(uid, before, accountIds));
+    onDone();
   }
 
   return (
@@ -113,6 +95,7 @@ export function TransactionForm({
             placeholder="0"
             placeholderTextColor={colors.border}
             autoFocus={!before}
+            onSubmitEditing={save}
             style={[styles.amountInput, { color: kindColor }]}
             accessibilityLabel="金額"
           />
@@ -161,7 +144,7 @@ export function TransactionForm({
         <ChipRow>
           <Chip label="今日" selected={date === today()} onPress={() => setDate(today())} />
           <Chip label="昨日" selected={date === addDays(today(), -1)} onPress={() => setDate(addDays(today(), -1))} />
-          <Chip label="日付を選ぶ" icon="calendar" selected={false} onPress={pickDate} />
+          <DateInput value={date} onChange={setDate} label="日付" />
         </ChipRow>
       </Field>
 
@@ -179,5 +162,6 @@ const styles = StyleSheet.create({
   container: { gap: spacing.lg },
   amountRow: { flexDirection: 'row', alignItems: 'center' },
   yen: { fontSize: 32, fontWeight: '700', marginRight: spacing.sm },
-  amountInput: { flex: 1, fontSize: 40, fontWeight: '700', paddingVertical: 0 },
+  // Web の input は既定で幅を持つので minWidth: 0 で行からはみ出さないようにする
+  amountInput: { flex: 1, minWidth: 0, fontSize: 40, fontWeight: '700', paddingVertical: 0, outlineWidth: 0 },
 });
