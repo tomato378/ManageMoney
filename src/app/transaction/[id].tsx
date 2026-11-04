@@ -1,18 +1,14 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 
-import { useData, useMonthTransactions } from '@/data/DataProvider';
-import { Empty, Loading, Screen } from '@/ui/components';
+import { useData } from '@/data/DataProvider';
+import { Empty, Screen } from '@/ui/components';
 import { emptyTransaction, TransactionForm } from '@/ui/TransactionForm';
 
 export default function TransactionEditScreen() {
-  const { id, month } = useLocalSearchParams<{ id: string; month?: string }>();
-  const { uid, thisMonth, settings, loading } = useData();
-  // 編集対象はその取引の月の購読から探す（新規なら今月の購読を使い回すだけ）
-  const txs = useMonthTransactions(uid, month ?? thisMonth);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { transactions, settings } = useData();
   const isNew = id === 'new';
-
-  if (loading || (!isNew && txs === null)) return <Loading />;
-  const before = isNew ? null : (txs?.find((t) => t.id === id) ?? null);
+  const before = isNew ? null : (transactions.find((t) => t.id === id) ?? null);
 
   return (
     <Screen>

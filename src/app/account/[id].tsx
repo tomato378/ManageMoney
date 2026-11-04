@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { useData } from '@/data/DataProvider';
-import { archiveAccount, runWrite, saveAccount } from '@/data/repo';
+import { archiveAccount, saveAccount } from '@/data/repo';
 import { ACCOUNT_TYPES } from '@/lib/defaults';
 import { parseAmount } from '@/lib/money';
 import type { AccountType } from '@/types';
@@ -11,7 +11,7 @@ import { confirmAsync, notify } from '@/ui/dialog';
 
 export default function AccountEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { uid, accounts, settings } = useData();
+  const { accounts, settings } = useData();
   const existing = accounts.find((a) => a.id === id) ?? null;
 
   const [name, setName] = useState(existing?.name ?? '');
@@ -24,16 +24,15 @@ export default function AccountEditScreen() {
       return;
     }
     const balance = parseAmount(balanceText, { allowNegative: true }) ?? 0;
-    runWrite(
-      saveAccount(uid, {
-        id: existing?.id,
-        name: name.trim(),
-        type,
-        balance,
-        sortOrder: existing?.sortOrder ?? accounts.length,
-        archived: false,
-      }),
-    );
+
+    saveAccount({
+      id: existing?.id,
+      name: name.trim(),
+      type,
+      balance,
+      sortOrder: existing?.sortOrder ?? accounts.length,
+      archived: false,
+    });
     router.back();
   }
 
@@ -44,7 +43,7 @@ export default function AccountEditScreen() {
       return;
     }
     if (!(await confirmAsync(`「${existing.name}」を削除しますか？`, '過去の取引は残ります。'))) return;
-    runWrite(archiveAccount(uid, existing.id));
+    archiveAccount(existing.id);
     router.back();
   }
 

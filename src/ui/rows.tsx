@@ -36,7 +36,7 @@ export function TransactionRow({
 
   return (
     <Row
-      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: tx.id, month: tx.date.slice(0, 7) } })}
+      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: tx.id } })}
       left={
         tx.kind === 'transfer' ? (
           <IconBadge icon="swap-horizontal" color={colors.transfer} />

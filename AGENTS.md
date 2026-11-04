@@ -1,4 +1,4 @@
-This is an Expo app that currently ships **only as a web app** (React Native Web, `expo export -p web`, hosted on Vercel). Use web-compatible APIs: `Alert` and native-only modules do not work on web — use `src/ui/dialog.ts` and the Firebase JS SDK. Keep layouts usable on both phone-width and desktop browsers.
+This is an Expo app that currently ships **only as a web app** (React Native Web, `expo export -p web`, hosted on Vercel). Use web-compatible APIs: `Alert` and native-only modules do not work on web — use `src/ui/dialog.ts`. There is no backend: all data lives in the browser's localStorage via `src/data/store.ts`, and every change goes through the pure functions in `src/data/state.ts`. Keep layouts usable on both phone-width and desktop browsers.
 
 ## Expo has changed — do not trust your training data
 

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
-import { deleteCategory, runWrite, saveCategory, updateSettings } from '@/data/repo';
+import { deleteCategory, saveCategory, updateSettings } from '@/data/repo';
 import { CATEGORY_COLORS, CATEGORY_ICONS } from '@/lib/defaults';
 import type { CategoryKind } from '@/types';
 import { Button, Field, IconBadge, Input, Screen, type IconName } from '@/ui/components';
@@ -13,7 +13,7 @@ import { colors } from '@/ui/theme';
 
 export default function CategoryEditScreen() {
   const params = useLocalSearchParams<{ id: string; kind?: CategoryKind }>();
-  const { uid, categories, settings } = useData();
+  const { categories, settings } = useData();
   const existing = categories.find((c) => c.id === params.id) ?? null;
   const kind: CategoryKind = existing?.kind ?? (params.kind === 'income' ? 'income' : 'expense');
 
@@ -26,16 +26,15 @@ export default function CategoryEditScreen() {
       notify('カテゴリ名を入力してください');
       return;
     }
-    runWrite(
-      saveCategory(uid, {
-        id: existing?.id,
-        name: name.trim(),
-        kind,
-        icon,
-        color,
-        sortOrder: existing?.sortOrder ?? categories.filter((c) => c.kind === kind).length,
-      }),
-    );
+
+    saveCategory({
+      id: existing?.id,
+      name: name.trim(),
+      kind,
+      icon,
+      color,
+      sortOrder: existing?.sortOrder ?? categories.filter((c) => c.kind === kind).length,
+    });
     router.back();
   }
 
@@ -44,9 +43,9 @@ export default function CategoryEditScreen() {
     if (!(await confirmAsync(`「${existing.name}」を削除しますか？`, '過去の取引は「未分類」として表示されます。'))) {
       return;
     }
-    runWrite(deleteCategory(uid, existing.id));
+    deleteCategory(existing.id);
     if (settings.quickCategoryIds.includes(existing.id)) {
-      runWrite(updateSettings(uid, { quickCategoryIds: settings.quickCategoryIds.filter((id) => id !== existing.id) }));
+      updateSettings({ quickCategoryIds: settings.quickCategoryIds.filter((id) => id !== existing.id) });
     }
     router.back();
   }

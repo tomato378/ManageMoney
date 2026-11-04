@@ -1,40 +1,35 @@
-import { signOut } from 'firebase/auth';
 import { router } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 
-import { useAuth } from '@/data/AuthProvider';
 import { useData } from '@/data/DataProvider';
-import { runWrite, updateSettings } from '@/data/repo';
-import { auth } from '@/lib/firebase';
+import { updateSettings } from '@/data/repo';
 import type { CategoryKind } from '@/types';
-import { Button, Card, Chip, ChipRow, IconBadge, Row, Screen, SectionTitle, TextLink } from '@/ui/components';
-import { confirmAsync, notify } from '@/ui/dialog';
+import { BackupCard } from '@/ui/BackupCard';
+import { Card, Chip, ChipRow, IconBadge, Row, Screen, SectionTitle, TextLink } from '@/ui/components';
+import { notify } from '@/ui/dialog';
 import { colors } from '@/ui/theme';
 
 const MAX_QUICK_BUTTONS = 4;
 
 export default function SettingsScreen() {
-  const { user } = useAuth();
-  const { uid, categories, accounts, settings } = useData();
+  const { categories, accounts, settings } = useData();
   const expenseCategories = categories.filter((c) => c.kind === 'expense');
 
   function toggleQuickCategory(id: string) {
     const current = settings.quickCategoryIds;
     if (current.includes(id)) {
-      runWrite(updateSettings(uid, { quickCategoryIds: current.filter((c) => c !== id) }));
+      updateSettings({ quickCategoryIds: current.filter((c) => c !== id) });
     } else if (current.length >= MAX_QUICK_BUTTONS) {
       notify(`クイック入力に置けるのは${MAX_QUICK_BUTTONS}つまでです`, 'どれかを外してから選んでください');
     } else {
-      runWrite(updateSettings(uid, { quickCategoryIds: [...current, id] }));
+      updateSettings({ quickCategoryIds: [...current, id] });
     }
-  }
-
-  async function logout() {
-    if (await confirmAsync('ログアウトしますか？')) await signOut(auth);
   }
 
   return (
     <Screen>
+      <BackupCard />
+
       <Card>
         <SectionTitle title="ホームのクイック入力ボタン" />
         <Text style={styles.caption}>
@@ -61,14 +56,14 @@ export default function SettingsScreen() {
           <Chip
             label="指定しない"
             selected={settings.defaultAccountId === null}
-            onPress={() => runWrite(updateSettings(uid, { defaultAccountId: null }))}
+            onPress={() => updateSettings({ defaultAccountId: null })}
           />
           {accounts.map((a) => (
             <Chip
               key={a.id}
               label={a.name}
               selected={a.id === settings.defaultAccountId}
-              onPress={() => runWrite(updateSettings(uid, { defaultAccountId: a.id }))}
+              onPress={() => updateSettings({ defaultAccountId: a.id })}
             />
           ))}
         </ChipRow>
@@ -97,12 +92,6 @@ export default function SettingsScreen() {
             ))}
         </Card>
       ))}
-
-      <Card>
-        <SectionTitle title="アカウント" />
-        <Text style={styles.caption}>{user?.email}</Text>
-        <Button title="ログアウト" variant="secondary" onPress={logout} />
-      </Card>
     </Screen>
   );
 }

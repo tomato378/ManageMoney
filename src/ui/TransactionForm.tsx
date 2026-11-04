@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
-import { deleteTransaction, runWrite, saveTransaction } from '@/data/repo';
+import { deleteTransaction, saveTransaction } from '@/data/repo';
 import { addDays, formatDate, today } from '@/lib/date';
 import { parseAmount } from '@/lib/money';
 import type { Transaction, TransactionInput, TransactionKind } from '@/types';
@@ -39,7 +39,7 @@ export function TransactionForm({
   initial: TransactionInput;
   onDone: () => void;
 }) {
-  const { uid, accounts, accountIds, categories } = useData();
+  const { accounts, categories } = useData();
   const [kind, setKind] = useState(initial.kind);
   const [amountText, setAmountText] = useState(initial.amount ? String(initial.amount) : '');
   const [categoryId, setCategoryId] = useState(initial.categoryId);
@@ -71,13 +71,13 @@ export function TransactionForm({
       date,
       memo: memo.trim(),
     };
-    runWrite(saveTransaction(uid, before, input, accountIds));
+    saveTransaction(before, input);
     onDone();
   }
 
   async function remove() {
     if (!before || !(await confirmAsync('この取引を削除しますか？'))) return;
-    runWrite(deleteTransaction(uid, before, accountIds));
+    deleteTransaction(before);
     onDone();
   }
 

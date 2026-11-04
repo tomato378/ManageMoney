@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
 import { useData } from '@/data/DataProvider';
-import { deleteBudget, runWrite, saveBudget } from '@/data/repo';
+import { deleteBudget, saveBudget } from '@/data/repo';
 import { parseAmount } from '@/lib/money';
 import { TOTAL_BUDGET_ID } from '@/types';
 import { Button, Chip, ChipRow, Field, Input, Screen } from '@/ui/components';
@@ -10,7 +10,7 @@ import { notify } from '@/ui/dialog';
 
 export default function BudgetEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { uid, budgets, categories } = useData();
+  const { budgets, categories } = useData();
   const existing = budgets.find((b) => b.id === id) ?? null;
   const expenseCategories = categories.filter((c) => c.kind === 'expense');
   // ほかの予算で使っている対象は選べない（1対象1予算）
@@ -31,14 +31,14 @@ export default function BudgetEditScreen() {
       return;
     }
     // カテゴリを変えた場合は古い予算を消して付け替える
-    if (existing && existing.categoryId !== categoryId) runWrite(deleteBudget(uid, existing.id));
-    runWrite(saveBudget(uid, categoryId, amount));
+    if (existing && existing.categoryId !== categoryId) deleteBudget(existing.id);
+    saveBudget(categoryId, amount);
     router.back();
   }
 
   function remove() {
     if (!existing) return;
-    runWrite(deleteBudget(uid, existing.id));
+    deleteBudget(existing.id);
     router.back();
   }
 

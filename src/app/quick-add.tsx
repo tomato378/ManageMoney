@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 
 import { useData } from '@/data/DataProvider';
 import type { TransactionKind } from '@/types';
-import { Loading, Screen } from '@/ui/components';
+import { Screen } from '@/ui/components';
 import { emptyTransaction, TransactionForm } from '@/ui/TransactionForm';
 
 /**
@@ -11,7 +11,7 @@ import { emptyTransaction, TransactionForm } from '@/ui/TransactionForm';
  */
 export default function QuickAddScreen() {
   const params = useLocalSearchParams<{ kind?: string; categoryId?: string }>();
-  const { settings, categories, loading } = useData();
+  const { settings, categories } = useData();
   const kind: TransactionKind = params.kind === 'income' ? 'income' : 'expense';
   const category = categories.find((c) => c.id === params.categoryId);
   const initial = { ...emptyTransaction(kind, settings.defaultAccountId), categoryId: params.categoryId ?? null };
@@ -20,9 +20,6 @@ export default function QuickAddScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   }
-
-  // フォームは初期値を最初の描画で決めるので、データが揃ってから出す
-  if (loading) return <Loading />;
 
   return (
     <Screen>

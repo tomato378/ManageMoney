@@ -1,8 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router/js-tabs';
 
-import { useData } from '@/data/DataProvider';
-import { Loading, type IconName } from '@/ui/components';
+import type { IconName } from '@/ui/components';
 import { colors } from '@/ui/theme';
 
 const TABS: { name: string; title: string; icon: IconName }[] = [
@@ -14,9 +13,6 @@ const TABS: { name: string; title: string; icon: IconName }[] = [
 ];
 
 export default function TabsLayout() {
-  const { loading } = useData();
-  if (loading) return <Loading />;
-
   return (
     <Tabs
       screenOptions={{

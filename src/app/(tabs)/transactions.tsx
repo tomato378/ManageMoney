@@ -14,9 +14,9 @@ import { TransactionRow } from '@/ui/rows';
 import { colors, spacing } from '@/ui/theme';
 
 export default function TransactionsScreen() {
-  const { uid, thisMonth, accounts, categories } = useData();
+  const { thisMonth, accounts, categories } = useData();
   const [month, setMonth] = useState(thisMonth);
-  const txs = useMonthTransactions(uid, month);
+  const txs = useMonthTransactions(month);
 
   return (
     <View style={styles.flex}>
