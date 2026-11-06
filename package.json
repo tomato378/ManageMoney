@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~57.0.17",
     "@expo/vector-icons": "^15.0.2",
+    "@tesseract.js-data/jpn": "^1.0.0",
     "expo": "~57.0.30",
     "expo-constants": "~57.0.22",
     "expo-font": "~57.0.4",
@@ -19,7 +20,8 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -31,9 +33,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start --web",
-    "web": "expo start --web",
-    "build": "expo export -p web",
+    "ocr": "node scripts/copy-ocr-assets.mjs",
+    "start": "npm run ocr && expo start --web",
+    "web": "npm run ocr && expo start --web",
+    "build": "npm run ocr && expo export -p web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest"

@@ -42,3 +42,6 @@ yarn-error.*
 
 # Vercel
 .vercel
+
+# レシート読み取り用（npm run ocr でビルドごとに node_modules からコピー）
+/public/ocr

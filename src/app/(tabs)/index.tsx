@@ -31,13 +31,19 @@ export default function HomeScreen() {
 
         <Card>
           <View style={styles.quickRow}>
-            <QuickButton label="－ 支出" color={colors.expense} filled params={{ kind: 'expense' }} />
-            <QuickButton label="＋ 収入" color={colors.income} filled params={{ kind: 'income' }} />
+            <QuickButton label="－ 支出" color={colors.expense} filled onPress={() => quickAdd({ kind: 'expense' })} />
+            <QuickButton label="＋ 収入" color={colors.income} filled onPress={() => quickAdd({ kind: 'income' })} />
+            <QuickButton label="📷 レシート" color={colors.primary} filled onPress={() => router.push('/receipt')} />
           </View>
           {quickCategories.length > 0 ? (
             <View style={styles.quickRow}>
               {quickCategories.map((c) => (
-                <QuickButton key={c.id} label={c.name} color={c.color} params={{ kind: 'expense', categoryId: c.id }} />
+                <QuickButton
+                  key={c.id}
+                  label={c.name}
+                  color={c.color}
+                  onPress={() => quickAdd({ kind: 'expense', categoryId: c.id })}
+                />
               ))}
             </View>
           ) : null}
@@ -91,20 +97,24 @@ export default function HomeScreen() {
   );
 }
 
+function quickAdd(params: { kind: 'expense' | 'income'; categoryId?: string }) {
+  router.push({ pathname: '/quick-add', params });
+}
+
 function QuickButton({
   label,
   color,
   filled = false,
-  params,
+  onPress,
 }: {
   label: string;
   color: string;
   filled?: boolean;
-  params: { kind: 'expense' | 'income'; categoryId?: string };
+  onPress: () => void;
 }) {
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/quick-add', params })}
+      onPress={onPress}
       style={({ pressed }) => [
         styles.quickButton,
         { backgroundColor: filled ? color : `${color}22`, opacity: pressed ? 0.75 : 1 },

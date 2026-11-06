@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="category/[id]" options={{ title: 'カテゴリ' }} />
         <Stack.Screen name="budget/[id]" options={{ title: '予算' }} />
         <Stack.Screen name="goal/[id]" options={{ title: '目標' }} />
+        <Stack.Screen name="receipt" options={{ title: 'レシートを読み取る' }} />
       </Stack>
     </DataProvider>
   );
