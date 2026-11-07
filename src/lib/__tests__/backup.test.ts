@@ -43,3 +43,21 @@ describe('バックアップ', () => {
     expect(backupFileName('2026-11-04')).toBe('managemoney-2026-11-04.json');
   });
 });
+
+describe('古いデータの読み込み', () => {
+  it('毎月の項目・残高チェック・使途不明金カテゴリ・支払い口座の設定を補う', () => {
+    const old = {
+      accounts: [],
+      categories: [{ id: 'food', name: '食費', kind: 'expense', icon: 'restaurant', color: '#000', sortOrder: 0 }],
+      transactions: [],
+      budgets: [],
+      goals: [],
+      settings: { quickCategoryIds: [], defaultAccountId: 'cash' },
+    };
+    const data = normalizeData(old)!;
+    expect(data.recurring).toEqual([]);
+    expect(data.balanceChecks).toEqual([]);
+    expect(data.categories.map((c) => c.id)).toEqual(['food', 'unknown', 'unknown-income']);
+    expect(data.settings.paymentAccountIds).toEqual({ cash: 'cash', credit: null, emoney: null });
+  });
+});

@@ -1,5 +1,5 @@
 import type { Account, AccountType, Budget, Category, Goal, Transaction, TransactionInput } from '@/types';
-import { monthsUntil } from './date';
+import { addMonths, monthOf, monthRange, monthsUntil } from './date';
 
 type BalanceAffecting = Pick<TransactionInput, 'kind' | 'amount' | 'accountId' | 'toAccountId'>;
 
@@ -152,4 +152,36 @@ export function goalProgress(goal: Goal, accounts: Account[], todayDate: string)
 
 export function sortCategories(categories: Category[]): Category[] {
   return [...categories].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'ja'));
+}
+
+export interface AssetPoint {
+  /** YYYY-MM */
+  month: string;
+  /** その月末の総資産（今月は今の総資産） */
+  total: number;
+}
+
+/**
+ * 月末ごとの総資産の推移。今の残高から、その月より後の取引の増減を引き戻して求める。
+ * いちばん古い取引の月から、最大 months か月分。
+ */
+export function assetHistory(accounts: Account[], txs: Transaction[], thisMonth: string, months = 12): AssetPoint[] {
+  const active = new Set(activeAccounts(accounts).map((a) => a.id));
+  const netOf = (tx: Transaction) =>
+    Object.entries(balanceDeltas(tx)).reduce((sum, [id, amount]) => (active.has(id) ? sum + amount : sum), 0);
+  const firstMonth = txs.reduce((min, tx) => (monthOf(tx.date) < min ? monthOf(tx.date) : min), thisMonth);
+  const start = [addMonths(thisMonth, -(months - 1)), firstMonth].sort().pop()!;
+  const now = totalAssets(accounts);
+  const points: AssetPoint[] = [];
+  for (let month = start; month <= thisMonth; month = addMonths(month, 1)) {
+    const { end } = monthRange(month);
+    const later = txs.filter((tx) => tx.date >= end).reduce((sum, tx) => sum + netOf(tx), 0);
+    points.push({ month, total: now - later });
+  }
+  return points;
+}
+
+/** 支出のうち、指定したカテゴリ（使途不明金など）の合計 */
+export function expenseOfCategory(txs: Transaction[], categoryId: string): number {
+  return txs.filter((t) => t.kind === 'expense' && t.categoryId === categoryId).reduce((sum, t) => sum + t.amount, 0);
 }

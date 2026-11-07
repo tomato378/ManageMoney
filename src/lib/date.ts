@@ -60,3 +60,15 @@ export function monthsUntil(from: string, to: string): number {
   const [ty, tm] = to.split('-').map(Number);
   return Math.max(0, (ty - fy) * 12 + (tm - fm) + 1);
 }
+
+/** その月の day 日（月末を超えれば末日）の日付 */
+export function dayInMonth(month: string, day: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return `${month}-${pad(Math.min(Math.max(1, day), last))}`;
+}
+
+/** from から to まで何日か（to が後なら正） */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((fromDateString(to).getTime() - fromDateString(from).getTime()) / 86_400_000);
+}

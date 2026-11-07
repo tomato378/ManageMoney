@@ -2,14 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { PieChart } from 'react-native-gifted-charts';
 
 import { useData, useMonthTransactions } from '@/data/DataProvider';
-import { expenseByCategory, summarizeTransactions } from '@/lib/calc';
+import { summarizeTransactions } from '@/lib/calc';
 import { addMonths, formatDate, formatMonth } from '@/lib/date';
-import { formatYen } from '@/lib/money';
 import type { Account, Category, Transaction } from '@/types';
 import { Amount, Card, CONTENT_MAX_WIDTH, Empty, Fab, Loading, Screen, SectionTitle } from '@/ui/components';
+import { CategoryBreakdown } from '@/ui/CategoryBreakdown';
 import { TransactionRow } from '@/ui/rows';
 import { colors, spacing } from '@/ui/theme';
 
@@ -51,11 +50,6 @@ function MonthDetail({
   accounts: Account[];
 }) {
   const summary = summarizeTransactions(txs);
-  const byCategory = expenseByCategory(txs);
-  const pieData = byCategory.map((t) => {
-    const category = categories.find((c) => c.id === t.categoryId);
-    return { value: t.amount, color: category?.color ?? colors.subText, name: category?.name ?? '未分類' };
-  });
   const days = groupByDate(txs);
 
   return (
@@ -77,29 +71,10 @@ function MonthDetail({
         </View>
       </Card>
 
-      {pieData.length > 0 ? (
+      {summary.expense > 0 ? (
         <Card>
           <SectionTitle title="支出の内訳" />
-          <View style={styles.chartRow}>
-            <PieChart
-              data={pieData}
-              donut
-              radius={70}
-              innerRadius={45}
-              centerLabelComponent={() => <Text style={styles.chartCenter}>{formatYen(summary.expense)}</Text>}
-            />
-            <View style={styles.legend}>
-              {pieData.slice(0, 6).map((d) => (
-                <View key={d.name} style={styles.legendRow}>
-                  <View style={[styles.legendDot, { backgroundColor: d.color }]} />
-                  <Text style={styles.legendName} numberOfLines={1}>
-                    {d.name}
-                  </Text>
-                  <Text style={styles.legendValue}>{Math.round((d.value / summary.expense) * 100)}%</Text>
-                </View>
-              ))}
-            </View>
-          </View>
+          <CategoryBreakdown txs={txs} categories={categories} />
         </Card>
       ) : null}
 
@@ -147,12 +122,5 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row' },
   summaryItem: { flex: 1, gap: 2 },
   label: { fontSize: 12, color: colors.subText },
-  chartRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
-  chartCenter: { fontSize: 12, fontWeight: '700', color: colors.text },
-  legend: { flex: 1, gap: 6 },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendName: { flex: 1, fontSize: 13, color: colors.text },
-  legendValue: { fontSize: 13, color: colors.subText },
   dateHeader: { fontSize: 13, fontWeight: '600', color: colors.subText },
 });

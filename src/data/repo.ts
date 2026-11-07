@@ -1,4 +1,4 @@
-import type { Account, AppSettings, Category, Goal, Transaction, TransactionInput } from '@/types';
+import type { Account, AppSettings, Category, Goal, RecurringItem, Transaction, TransactionInput } from '@/types';
 import * as state from './state';
 import { update } from './store';
 
@@ -26,6 +26,13 @@ export function saveTransaction(before: Transaction | null, input: TransactionIn
   update((d) => state.saveTransaction(d, before, input));
 }
 
+/** 新しい取引を保存して、その ID を返す */
+export function addTransaction(input: TransactionInput): string {
+  const id = state.newId();
+  update((d) => state.saveTransaction(d, null, input, Date.now(), id));
+  return id;
+}
+
 export function deleteTransaction(tx: Transaction) {
   update((d) => state.deleteTransaction(d, tx));
 }
@@ -48,4 +55,24 @@ export function deleteGoal(id: string) {
 
 export function updateSettings(patch: Partial<AppSettings>) {
   update((d) => state.updateSettings(d, patch));
+}
+
+export function saveTransactions(inputs: TransactionInput[]) {
+  update((d) => state.saveTransactions(d, inputs));
+}
+
+export function reconcileBalances(actuals: Record<string, number>, date: string) {
+  update((d) => state.reconcileBalances(d, actuals, date));
+}
+
+export function saveRecurring(item: WithOptionalId<RecurringItem>) {
+  update((d) => state.saveRecurring(d, item));
+}
+
+export function deleteRecurring(id: string) {
+  update((d) => state.deleteRecurring(d, id));
+}
+
+export function postDueRecurring(today: string) {
+  update((d) => state.postDueRecurring(d, today));
 }

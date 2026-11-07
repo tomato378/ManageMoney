@@ -54,7 +54,9 @@ export function getSnapshot(): AppData {
 
 /** データを変更して保存する。fn は state.ts の純粋関数 */
 export function update(fn: (current: AppData) => AppData) {
-  data = fn(data);
+  const next = fn(data);
+  if (next === data) return;
+  data = next;
   if (!persist(data)) {
     notify('保存できませんでした', 'ブラウザの保存容量がいっぱいか、保存が許可されていません。');
   }

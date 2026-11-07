@@ -1,4 +1,5 @@
 import {
+  assetHistory,
   balanceDeltaDiff,
   balanceDeltas,
   budgetStatuses,
@@ -181,5 +182,33 @@ describe('goalProgress', () => {
 
   it('期日を過ぎていたら残り全額', () => {
     expect(goalProgress(goal, [], '2027-02-01').monthlyNeeded).toBe(90000);
+  });
+});
+
+describe('総資産の推移', () => {
+  const accounts = [{ id: 'cash', name: '財布', type: 'cash' as const, balance: 50000, sortOrder: 0, archived: false }];
+  const tx = (date: string, kind: 'income' | 'expense', amount: number) => ({
+    id: date + kind,
+    kind,
+    amount,
+    categoryId: null,
+    accountId: 'cash',
+    toAccountId: null,
+    date,
+    memo: '',
+    createdAt: 0,
+  });
+
+  it('今の残高から各月末の総資産を引き戻す', () => {
+    const txs = [tx('2026-09-10', 'income', 100000), tx('2026-10-05', 'expense', 30000), tx('2026-11-02', 'expense', 20000)];
+    expect(assetHistory(accounts, txs, '2026-11')).toEqual([
+      { month: '2026-09', total: 100000 },
+      { month: '2026-10', total: 70000 },
+      { month: '2026-11', total: 50000 },
+    ]);
+  });
+
+  it('記録がなければ今月だけ', () => {
+    expect(assetHistory(accounts, [], '2026-11')).toEqual([{ month: '2026-11', total: 50000 }]);
   });
 });

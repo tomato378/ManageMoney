@@ -1,6 +1,10 @@
 import type { Account, AccountType, AppSettings, Category } from '@/types';
 
-/** 初回ログイン時に作るカテゴリ。ID を固定して二重作成を防ぐ */
+/** 残高チェックでずれを記録するカテゴリ */
+export const UNKNOWN_EXPENSE_ID = 'unknown';
+export const UNKNOWN_INCOME_ID = 'unknown-income';
+
+/** 初回に作るカテゴリ。ID を固定して二重作成を防ぐ */
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'food', name: '食費', kind: 'expense', icon: 'restaurant', color: '#F97316', sortOrder: 0 },
   { id: 'daily', name: '日用品', kind: 'expense', icon: 'cart', color: '#EAB308', sortOrder: 1 },
@@ -12,9 +16,11 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'clothes', name: '衣服', kind: 'expense', icon: 'shirt', color: '#14B8A6', sortOrder: 7 },
   { id: 'medical', name: '医療', kind: 'expense', icon: 'medkit', color: '#EF4444', sortOrder: 8 },
   { id: 'other-expense', name: 'その他', kind: 'expense', icon: 'ellipsis-horizontal', color: '#6B7280', sortOrder: 9 },
+  { id: UNKNOWN_EXPENSE_ID, name: '使途不明金', kind: 'expense', icon: 'help-circle', color: '#9CA3AF', sortOrder: 10 },
   { id: 'salary', name: '給与', kind: 'income', icon: 'cash', color: '#16A34A', sortOrder: 0 },
   { id: 'side-job', name: '副業', kind: 'income', icon: 'briefcase', color: '#0EA5E9', sortOrder: 1 },
   { id: 'other-income', name: 'その他収入', kind: 'income', icon: 'gift', color: '#84CC16', sortOrder: 2 },
+  { id: UNKNOWN_INCOME_ID, name: '使途不明の収入', kind: 'income', icon: 'help-circle', color: '#9CA3AF', sortOrder: 3 },
 ];
 
 export const DEFAULT_ACCOUNT: Account = {
@@ -29,11 +35,13 @@ export const DEFAULT_ACCOUNT: Account = {
 export const DEFAULT_SETTINGS: AppSettings = {
   quickCategoryIds: ['food', 'daily', 'transport', 'hobby'],
   defaultAccountId: DEFAULT_ACCOUNT.id,
+  paymentAccountIds: { cash: DEFAULT_ACCOUNT.id, credit: null, emoney: null },
 };
 
 export const ACCOUNT_TYPES: { type: AccountType; label: string; icon: string }[] = [
   { type: 'bank', label: '銀行', icon: 'business' },
   { type: 'cash', label: '現金', icon: 'wallet' },
+  { type: 'emoney', label: '電子マネー', icon: 'phone-portrait' },
   { type: 'securities', label: '証券', icon: 'trending-up' },
   { type: 'crypto', label: '暗号資産', icon: 'logo-bitcoin' },
   { type: 'credit', label: 'クレカ', icon: 'card' },
@@ -92,5 +100,6 @@ export const CATEGORY_ICONS = [
   'trending-up',
   'card',
   'receipt',
+  'help-circle',
   'ellipsis-horizontal',
 ];

@@ -1,4 +1,4 @@
-import type { Category } from '@/types';
+import type { Account, AppSettings, Category, PaymentMethod, Transaction, TransactionInput } from '@/types';
 import { addDays, toDateString } from './date';
 
 /**
@@ -261,4 +261,143 @@ export function guessCategoryId(text: string, categories: Pick<Category, 'id' | 
     if (rule.keywords.some((k) => containsKeyword(normalized, k))) return rule.categoryId;
   }
   return null;
+}
+
+/** 支払い方法を表す言葉。電子マネーはクレジットより先に調べる（「iD」「QUICPay」はカード連動でも電子マネー扱い） */
+const PAYMENT_RULES: { method: PaymentMethod; keywords: string[] }[] = [
+  {
+    method: 'emoney',
+    keywords: [
+      'PayPay',
+      'ペイペイ',
+      '楽天ペイ',
+      'd払い',
+      'au PAY',
+      'auPAY',
+      'メルペイ',
+      'LINE Pay',
+      'Suica',
+      'スイカ',
+      'PASMO',
+      'ICOCA',
+      '交通系',
+      'WAON',
+      'nanaco',
+      '楽天Edy',
+      'Edy',
+      'QUICPay',
+      'iD',
+      '電子マネー',
+      'コード決済',
+      'QR決済',
+    ],
+  },
+  {
+    method: 'credit',
+    keywords: ['クレジット', 'CREDIT', 'VISA', 'Mastercard', 'MasterCard', 'JCB', 'AMEX', 'Diners', 'カード支払', 'カード払', 'クレカ'],
+  },
+  { method: 'cash', keywords: ['お預り', 'お預かり', '預り', 'お釣', 'おつり', '釣銭', '現金'] },
+];
+
+/** 「iD」のような短い英字は「会員ID」と区別するため大文字小文字も一致させる */
+function paymentKeywordIn(text: string, keyword: string): boolean {
+  if (/^[A-Za-z]{1,3}$/.test(keyword)) return new RegExp(`(^|[^A-Za-z])${keyword}([^A-Za-z]|$)`).test(text);
+  return containsKeyword(text, keyword);
+}
+
+/** レシートの文字から支払い方法を推測する。わからなければ null */
+export function findPaymentMethod(text: string): PaymentMethod | null {
+  const normalized = linesOf(text).map(compact).join('\n');
+  for (const rule of PAYMENT_RULES) {
+    if (rule.keywords.some((k) => paymentKeywordIn(normalized, k.replace(/\s+/g, '')))) return rule.method;
+  }
+  return null;
+}
+
+export type ReviewReason = 'amount' | 'date' | 'duplicate';
+
+/**
+ * 自動で記録してよいか。金額・日付が読めなかったもの、
+ * 同じ日・同じ金額の支出がすでにある（二重に撮った・前に記録済み）ものは確認に回す。
+ */
+export function reviewReasons(
+  fields: ReceiptFields,
+  existing: Pick<Transaction, 'kind' | 'date' | 'amount'>[],
+): ReviewReason[] {
+  const reasons: ReviewReason[] = [];
+  if (fields.amount === null) reasons.push('amount');
+  if (fields.date === null) reasons.push('date');
+  if (
+    fields.amount !== null &&
+    fields.date !== null &&
+    existing.some((t) => t.kind === 'expense' && t.date === fields.date && t.amount === fields.amount)
+  ) {
+    reasons.push('duplicate');
+  }
+  return reasons;
+}
+
+export const REVIEW_REASON_LABELS: Record<ReviewReason, string> = {
+  amount: '金額を読み取れませんでした',
+  date: '日付を読み取れませんでした',
+  duplicate: '同じ日・同じ金額の支出がすでにあります',
+};
+
+const ACCOUNT_TYPE_FOR_PAYMENT: Record<PaymentMethod, Account['type']> = {
+  cash: 'cash',
+  credit: 'credit',
+  emoney: 'emoney',
+};
+
+/**
+ * 支払い方法から払った口座を決める。設定で選んだ口座 → その種類の最初の口座 → 既定の口座 の順。
+ * 支払い方法がわからないときは現金扱い。
+ */
+export function accountForPayment(
+  method: PaymentMethod | null,
+  accounts: Pick<Account, 'id' | 'type' | 'archived'>[],
+  settings: Pick<AppSettings, 'paymentAccountIds' | 'defaultAccountId'>,
+): string | null {
+  const active = accounts.filter((a) => !a.archived);
+  const m = method ?? 'cash';
+  const chosen = settings.paymentAccountIds[m];
+  if (chosen && active.some((a) => a.id === chosen)) return chosen;
+  const byType = active.find((a) => a.type === ACCOUNT_TYPE_FOR_PAYMENT[m]);
+  if (byType) return byType.id;
+  return active.some((a) => a.id === settings.defaultAccountId) ? settings.defaultAccountId : null;
+}
+
+export interface ReceiptReading {
+  input: TransactionInput;
+  method: PaymentMethod | null;
+  reasons: ReviewReason[];
+}
+
+/** 読み取った文字から、記録する支出と、確認が必要かどうかを作る */
+export function readingFromText(
+  text: string,
+  todayDate: string,
+  data: {
+    categories: Pick<Category, 'id' | 'kind'>[];
+    accounts: Pick<Account, 'id' | 'type' | 'archived'>[];
+    settings: Pick<AppSettings, 'paymentAccountIds' | 'defaultAccountId'>;
+    transactions: Pick<Transaction, 'kind' | 'date' | 'amount'>[];
+  },
+): ReceiptReading {
+  const fields = parseReceipt(text, todayDate);
+  const method = findPaymentMethod(text);
+  const fallbackCategory = data.categories.find((c) => c.id === 'other-expense' && c.kind === 'expense')?.id ?? null;
+  return {
+    input: {
+      kind: 'expense',
+      amount: fields.amount ?? 0,
+      categoryId: guessCategoryId(text, data.categories) ?? fallbackCategory,
+      accountId: accountForPayment(method, data.accounts, data.settings),
+      toAccountId: null,
+      date: fields.date ?? todayDate,
+      memo: fields.storeName ?? '',
+    },
+    method,
+    reasons: reviewReasons(fields, data.transactions),
+  };
 }

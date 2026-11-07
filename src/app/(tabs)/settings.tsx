@@ -1,29 +1,24 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { useData } from '@/data/DataProvider';
 import { updateSettings } from '@/data/repo';
-import type { CategoryKind } from '@/types';
+import type { CategoryKind, PaymentMethod } from '@/types';
 import { BackupCard } from '@/ui/BackupCard';
-import { Card, Chip, ChipRow, IconBadge, Row, Screen, SectionTitle, TextLink } from '@/ui/components';
-import { notify } from '@/ui/dialog';
+import { Amount, Card, Chip, ChipRow, IconBadge, Row, Screen, SectionTitle, TextLink } from '@/ui/components';
 import { colors } from '@/ui/theme';
 
-const MAX_QUICK_BUTTONS = 4;
+const PAYMENT_METHODS: { method: PaymentMethod; label: string }[] = [
+  { method: 'cash', label: '現金' },
+  { method: 'credit', label: 'クレジットカード' },
+  { method: 'emoney', label: '電子マネー・QR決済' },
+];
 
 export default function SettingsScreen() {
-  const { categories, accounts, settings } = useData();
-  const expenseCategories = categories.filter((c) => c.kind === 'expense');
+  const { categories, accounts, settings, recurring } = useData();
 
-  function toggleQuickCategory(id: string) {
-    const current = settings.quickCategoryIds;
-    if (current.includes(id)) {
-      updateSettings({ quickCategoryIds: current.filter((c) => c !== id) });
-    } else if (current.length >= MAX_QUICK_BUTTONS) {
-      notify(`クイック入力に置けるのは${MAX_QUICK_BUTTONS}つまでです`, 'どれかを外してから選んでください');
-    } else {
-      updateSettings({ quickCategoryIds: [...current, id] });
-    }
+  function setPaymentAccount(method: PaymentMethod, accountId: string | null) {
+    updateSettings({ paymentAccountIds: { ...settings.paymentAccountIds, [method]: accountId } });
   }
 
   return (
@@ -31,27 +26,73 @@ export default function SettingsScreen() {
       <BackupCard />
 
       <Card>
-        <SectionTitle title="ホームのクイック入力ボタン" />
-        <Text style={styles.caption}>
-          ホーム画面のボタンに出す支出カテゴリ（{settings.quickCategoryIds.length}/{MAX_QUICK_BUTTONS}
-          ）。押すとそのカテゴリを選んだ状態で入力画面が開きます。
-        </Text>
-        <ChipRow>
-          {expenseCategories.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.name}
-              icon={c.icon}
-              color={c.color}
-              selected={settings.quickCategoryIds.includes(c.id)}
-              onPress={() => toggleQuickCategory(c.id)}
+        <SectionTitle
+          title="毎月の収入・固定費"
+          action={
+            <TextLink
+              title="＋ 追加"
+              onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: 'new' } })}
             />
-          ))}
-        </ChipRow>
+          }
+        />
+        <Text style={styles.caption}>給料・家賃・サブスクなど。毎月その日に自動で記録します。</Text>
+        {recurring.map((r) => (
+          <Row
+            key={r.id}
+            left={
+              <IconBadge
+                icon={categories.find((c) => c.id === r.categoryId)?.icon ?? 'repeat'}
+                color={r.kind === 'income' ? colors.income : colors.expense}
+                size={30}
+              />
+            }
+            title={r.name}
+            subtitle={`毎月${r.dayOfMonth >= 31 ? '月末' : `${r.dayOfMonth}日`}・${accounts.find((a) => a.id === r.accountId)?.name ?? '口座なし'}`}
+            right={<Amount value={r.kind === 'expense' ? -r.amount : r.amount} signed={r.kind === 'income'} />}
+            onPress={() => router.push({ pathname: '/recurring/[id]', params: { id: r.id } })}
+          />
+        ))}
       </Card>
 
       <Card>
-        <SectionTitle title="入力時のデフォルト口座" />
+        <SectionTitle title="レシートの支払い方法と口座" />
+        <Text style={styles.caption}>
+          レシートに書かれた支払い方法から、どの口座で払ったかを決めます。「自動」はその種類の最初の口座です。
+        </Text>
+        {PAYMENT_METHODS.map((m) => (
+          <View key={m.method} style={styles.paymentRow}>
+            <Text style={styles.paymentLabel}>{m.label}</Text>
+            <ChipRow>
+              <Chip
+                label="自動"
+                selected={!settings.paymentAccountIds[m.method]}
+                onPress={() => setPaymentAccount(m.method, null)}
+              />
+              {accounts.map((a) => (
+                <Chip
+                  key={a.id}
+                  label={a.name}
+                  selected={a.id === settings.paymentAccountIds[m.method]}
+                  onPress={() => setPaymentAccount(m.method, a.id)}
+                />
+              ))}
+            </ChipRow>
+          </View>
+        ))}
+      </Card>
+
+      <Card>
+        <SectionTitle title="予算・目標" />
+        <Text style={styles.caption}>月の予算や貯金の目標を立てたいときに使います。</Text>
+        <Row
+          left={<IconBadge icon="flag" color={colors.primary} size={30} />}
+          title="予算・目標を開く"
+          onPress={() => router.navigate('/plan')}
+        />
+      </Card>
+
+      <Card>
+        <SectionTitle title="手で入力するときの口座" />
         <ChipRow>
           <Chip
             label="指定しない"
@@ -98,4 +139,6 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   caption: { fontSize: 13, color: colors.subText, lineHeight: 19 },
+  paymentRow: { gap: 6 },
+  paymentLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
 });

@@ -1,5 +1,5 @@
 import type { AppData } from '@/data/state';
-import { DEFAULT_SETTINGS } from './defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID } from './defaults';
 
 const APP = 'managemoney';
 const VERSION = 1;
@@ -17,18 +17,39 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** 保存データ・バックアップの中身として形が正しければ AppData に整えて返す（足りない設定は既定値で補う） */
+/** 後から増えた一覧。古いデータになければ空で始める */
+const OPTIONAL_LIST_KEYS = ['recurring', 'balanceChecks'] as const;
+
+/** 残高チェックに必要なので、古いデータにもなければ足すカテゴリ */
+const REQUIRED_CATEGORY_IDS = [UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID];
+
+/**
+ * 保存データ・バックアップの中身として形が正しければ AppData に整えて返す。
+ * 古い形のデータは、足りない一覧・設定・カテゴリを既定値で補う。
+ */
 export function normalizeData(value: unknown): AppData | null {
   if (!isObject(value)) return null;
   if (!LIST_KEYS.every((key) => Array.isArray(value[key]))) return null;
   const settings = isObject(value.settings) ? value.settings : {};
+  const paymentAccountIds = isObject(settings.paymentAccountIds) ? settings.paymentAccountIds : {};
+  const categories = value.categories as AppData['categories'];
+  const missingCategories = DEFAULT_CATEGORIES.filter(
+    (c) => REQUIRED_CATEGORY_IDS.includes(c.id) && !categories.some((existing) => existing.id === c.id),
+  ).map((c) => ({ ...c }));
+  const [recurring, balanceChecks] = OPTIONAL_LIST_KEYS.map((key) => (Array.isArray(value[key]) ? value[key] : []));
   return {
     accounts: value.accounts as AppData['accounts'],
-    categories: value.categories as AppData['categories'],
+    categories: [...categories, ...missingCategories],
     transactions: value.transactions as AppData['transactions'],
     budgets: value.budgets as AppData['budgets'],
     goals: value.goals as AppData['goals'],
-    settings: { ...DEFAULT_SETTINGS, ...settings } as AppData['settings'],
+    recurring: recurring as AppData['recurring'],
+    balanceChecks: balanceChecks as AppData['balanceChecks'],
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...settings,
+      paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds, ...paymentAccountIds },
+    } as AppData['settings'],
   };
 }
 

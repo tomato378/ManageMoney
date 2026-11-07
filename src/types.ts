@@ -1,4 +1,4 @@
-export type AccountType = 'bank' | 'cash' | 'securities' | 'crypto' | 'credit' | 'other';
+export type AccountType = 'bank' | 'cash' | 'emoney' | 'securities' | 'crypto' | 'credit' | 'other';
 
 export interface Account {
   id: string;
@@ -62,11 +62,41 @@ export interface Goal {
   currentAmount: number;
 }
 
+/** レシートから読み取る支払い方法 */
+export type PaymentMethod = 'cash' | 'credit' | 'emoney';
+
 export interface AppSettings {
   /** ホームのクイック入力ボタンに出す支出カテゴリ（最大4つ） */
   quickCategoryIds: string[];
   /** 入力時に最初から選ばれている口座 */
   defaultAccountId: string | null;
+  /** レシートの支払い方法ごとに、どの口座から払ったことにするか（未設定は defaultAccountId） */
+  paymentAccountIds: Record<PaymentMethod, string | null>;
+}
+
+/** 毎月決まって入る収入・出る固定費。指定日を過ぎると自動で取引になる */
+export interface RecurringItem {
+  id: string;
+  name: string;
+  kind: 'income' | 'expense';
+  /** 円（だいたいの額でよい。ずれは残高チェックで調整される） */
+  amount: number;
+  categoryId: string | null;
+  accountId: string | null;
+  /** 1〜31。月末より大きければその月の末日 */
+  dayOfMonth: number;
+  /** 最後に取引を作った月（YYYY-MM）。null ならまだ作っていない */
+  lastPostedMonth: string | null;
+  /** この月（YYYY-MM）から記録する */
+  startMonth: string;
+}
+
+/** 残高チェック1回分。記録上の残高と実際の残高 */
+export interface BalanceCheck {
+  id: string;
+  /** YYYY-MM-DD */
+  date: string;
+  entries: { accountId: string; recorded: number; actual: number }[];
 }
 
 export const TOTAL_BUDGET_ID = 'total';

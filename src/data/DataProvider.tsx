@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { activeAccounts, sortCategories } from '@/lib/calc';
-import { currentMonth, monthOf } from '@/lib/date';
-import type { Account, AppSettings, Budget, Category, Goal, Transaction } from '@/types';
+import { currentMonth, monthOf, today } from '@/lib/date';
+import type { Account, AppSettings, BalanceCheck, Budget, Category, Goal, RecurringItem, Transaction } from '@/types';
+import { postDueRecurring } from './repo';
 import { getSnapshot, subscribe } from './store';
 
 interface DataState {
@@ -14,6 +15,9 @@ interface DataState {
   transactions: Transaction[];
   budgets: Budget[];
   goals: Goal[];
+  recurring: RecurringItem[];
+  /** 古い順 */
+  balanceChecks: BalanceCheck[];
   settings: AppSettings;
   /** 今月の取引（ホーム・予算用） */
   thisMonth: string;
@@ -29,11 +33,18 @@ function transactionsOfMonth(transactions: Transaction[], month: string): Transa
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
-/** 日付が変わったら今月を更新する（開いたまま月をまたいだとき用） */
+/**
+ * 日付が変わったら今月を更新する（開いたまま月をまたいだとき用）。
+ * あわせて、指定日を過ぎた毎月の収入・固定費を記録する。
+ */
 function useCurrentMonth(): string {
   const [month, setMonth] = useState(currentMonth);
   useEffect(() => {
-    const timer = setInterval(() => setMonth(currentMonth()), 60_000);
+    postDueRecurring(today());
+    const timer = setInterval(() => {
+      setMonth(currentMonth());
+      postDueRecurring(today());
+    }, 60_000);
     return () => clearInterval(timer);
   }, []);
   return month;
@@ -51,6 +62,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       transactions: data.transactions,
       budgets: data.budgets,
       goals: data.goals,
+      recurring: data.recurring,
+      balanceChecks: data.balanceChecks,
       settings: data.settings,
       thisMonth,
       thisMonthTransactions: transactionsOfMonth(data.transactions, thisMonth),
