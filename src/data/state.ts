@@ -52,6 +52,8 @@ export function seedData(): AppData {
       ...DEFAULT_SETTINGS,
       quickCategoryIds: [...DEFAULT_SETTINGS.quickCategoryIds],
       paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds },
+      statementAccountIds: {},
+      confirmedAt: {},
     },
   };
 }
@@ -62,8 +64,16 @@ function upsert<T extends { id: string }>(items: T[], item: T): T[] {
 
 // ---- 口座 ----
 
-export function saveAccount(data: AppData, account: WithOptionalId<Account>): AppData {
-  return { ...data, accounts: upsert(data.accounts, { ...account, id: account.id ?? newId() }) };
+/**
+ * 口座を保存する。today を渡すと、残高を手で入れた（新しく作った・残高を変えた）ときに
+ * その日を「残高を確かめた日」として記録する。
+ */
+export function saveAccount(data: AppData, account: WithOptionalId<Account>, today?: string): AppData {
+  const id = account.id ?? newId();
+  const before = data.accounts.find((a) => a.id === id);
+  const next = { ...data, accounts: upsert(data.accounts, { ...account, id }) };
+  if (!today || (before && before.balance === account.balance)) return next;
+  return { ...next, settings: { ...next.settings, confirmedAt: { ...next.settings.confirmedAt, [id]: today } } };
 }
 
 /** 取引から参照されている可能性があるので、口座は消さずにアーカイブする */
@@ -165,10 +175,17 @@ export function reconcileBalances(
   const entries: BalanceCheck['entries'] = [];
   const surplus: { accountId: string; amount: number }[] = [];
   const shortage: { accountId: string; amount: number }[] = [];
+  // 一度も残高を確かめていない口座は、記録との差に意味がない（記録を始める前の動きの分）。
+  // 初回は差を記録せずに今の残高にそろえ、そこを起点にする
+  const firstTime = new Set<string>();
   for (const account of data.accounts) {
     const actual = actuals[account.id];
     if (actual === undefined || account.archived) continue;
     entries.push({ accountId: account.id, recorded: account.balance, actual });
+    if (!data.settings.confirmedAt[account.id]) {
+      firstTime.add(account.id);
+      continue;
+    }
     const diff = actual - account.balance;
     if (diff > 0) surplus.push({ accountId: account.id, amount: diff });
     if (diff < 0) shortage.push({ accountId: account.id, amount: -diff });
@@ -176,7 +193,7 @@ export function reconcileBalances(
   if (entries.length === 0) return data;
 
   const inputs: TransactionInput[] = [];
-  const base = { date, memo: ADJUSTMENT_MEMO, toAccountId: null, categoryId: null };
+  const base = { date, memo: ADJUSTMENT_MEMO, toAccountId: null, categoryId: null, origin: 'adjustment' as const };
   // 大きい順に組み合わせると、振替の件数が少なくて済む
   surplus.sort((a, b) => b.amount - a.amount);
   shortage.sort((a, b) => b.amount - a.amount);
@@ -197,8 +214,18 @@ export function reconcileBalances(
     if (s.amount > 0) inputs.push({ ...base, kind: 'expense', amount: s.amount, accountId: s.accountId, categoryId: UNKNOWN_EXPENSE_ID });
   }
 
-  const reconciled = saveTransactions(data, inputs, now);
-  return { ...reconciled, balanceChecks: [...data.balanceChecks, { id: newId(), date, entries }] };
+  const baselined = {
+    ...data,
+    accounts: data.accounts.map((a) => (firstTime.has(a.id) ? { ...a, balance: actuals[a.id] } : a)),
+  };
+  const reconciled = saveTransactions(baselined, inputs, now);
+  const confirmedAt = { ...reconciled.settings.confirmedAt };
+  for (const e of entries) confirmedAt[e.accountId] = date;
+  return {
+    ...reconciled,
+    settings: { ...reconciled.settings, confirmedAt },
+    balanceChecks: [...data.balanceChecks, { id: newId(), date, entries }],
+  };
 }
 
 // ---- 毎月の収入・固定費 ----
@@ -238,6 +265,7 @@ export function postDueRecurring(data: AppData, today: string, now = Date.now())
           toAccountId: null,
           date,
           memo: item.name,
+          origin: 'recurring',
         },
         now,
       );

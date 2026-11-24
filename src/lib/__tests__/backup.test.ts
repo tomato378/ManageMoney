@@ -57,7 +57,7 @@ describe('古いデータの読み込み', () => {
     const data = normalizeData(old)!;
     expect(data.recurring).toEqual([]);
     expect(data.balanceChecks).toEqual([]);
-    expect(data.categories.map((c) => c.id)).toEqual(['food', 'unknown', 'unknown-income']);
+    expect(data.categories.map((c) => c.id)).toEqual(['food', 'unknown', 'split', 'fee', 'unknown-income']);
     expect(data.settings.paymentAccountIds).toEqual({ cash: 'cash', credit: null, emoney: null });
   });
 });

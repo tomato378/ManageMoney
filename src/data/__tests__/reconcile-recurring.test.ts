@@ -6,7 +6,8 @@ function withAccounts(): AppData {
   data = saveAccount(data, { id: 'cash', name: '財布', type: 'cash', balance: 10000, sortOrder: 0, archived: false });
   data = saveAccount(data, { id: 'bank', name: '銀行', type: 'bank', balance: 200000, sortOrder: 1, archived: false });
   data = saveAccount(data, { id: 'card', name: 'カード', type: 'credit', balance: -30000, sortOrder: 2, archived: false });
-  return data;
+  // 前に一度残高を確かめた口座として始める
+  return { ...data, settings: { ...data.settings, confirmedAt: { cash: '2026-10-01', bank: '2026-10-01', card: '2026-10-01' } } };
 }
 
 const balanceOf = (data: AppData, id: string) => data.accounts.find((a) => a.id === id)!.balance;
@@ -45,6 +46,17 @@ describe('残高チェック', () => {
     const data = reconcileBalances(withAccounts(), { cash: 10000 }, '2026-11-07');
     expect(data.transactions).toEqual([]);
     expect(data.balanceChecks).toHaveLength(1);
+  });
+
+  it('一度も確かめていない口座は、差を記録せずに残高をそろえる', () => {
+    const fresh = saveAccount(seedData(), { id: 'pp', name: 'PayPay', type: 'emoney', balance: -5000, sortOrder: 0, archived: false });
+    const data = reconcileBalances(fresh, { pp: 1200 }, '2026-11-07');
+    expect(balanceOf(data, 'pp')).toBe(1200);
+    expect(data.transactions).toEqual([]);
+    expect(data.settings.confirmedAt.pp).toBe('2026-11-07');
+    // 2回目からは差を記録する
+    const second = reconcileBalances(data, { pp: 900 }, '2026-11-20');
+    expect(second.transactions).toEqual([expect.objectContaining({ kind: 'expense', amount: 300, categoryId: 'unknown' })]);
   });
 
   it('何も入力しなければ何も変えない', () => {

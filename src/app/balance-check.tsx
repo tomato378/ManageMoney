@@ -29,7 +29,7 @@ function diffText(diff: number, credit = false): string {
  * 確定すると、ずれを「使途不明金」などとして記録し、残高を実際の額に合わせる。
  */
 export default function BalanceCheckScreen() {
-  const { accounts, balanceChecks } = useData();
+  const { accounts, balanceChecks, settings } = useData();
   const [texts, setTexts] = useState<Record<string, string>>({});
   const last = balanceChecks[balanceChecks.length - 1];
 
@@ -39,7 +39,9 @@ export default function BalanceCheckScreen() {
     if (value !== null) actuals[a.id] = toBalance(a, value);
   }
   const entered = accounts.filter((a) => actuals[a.id] !== undefined);
-  const totalDiff = entered.reduce((sum, a) => sum + (actuals[a.id] - a.balance), 0);
+  // 初めて確かめる口座は差を記録しない（記録を始める前の分なので）
+  const isFirst = (id: string) => !settings.confirmedAt[id];
+  const totalDiff = entered.filter((a) => !isFirst(a.id)).reduce((sum, a) => sum + (actuals[a.id] - a.balance), 0);
 
   async function confirm() {
     const message =
@@ -62,6 +64,13 @@ export default function BalanceCheckScreen() {
       </Card>
 
       <Card>
+        <Text style={styles.caption}>
+          先にカード・銀行・PayPay の明細を取り込んでおくと、どの口座から払ったかが正しくなり、残ったずれが本当の使途不明金になります。銀行の残高は明細から自動で合います。
+        </Text>
+        <Button title="明細を取り込む" variant="secondary" onPress={() => router.push('/import')} />
+      </Card>
+
+      <Card>
         {accounts.map((a) => {
           const actual = actuals[a.id];
           const diff = actual === undefined ? null : actual - a.balance;
@@ -73,6 +82,7 @@ export default function BalanceCheckScreen() {
               </View>
               <Text style={styles.recorded}>
                 記録上：{a.type === 'credit' ? `未払い ${formatYen(-a.balance)}` : formatYen(a.balance)}
+                {settings.confirmedAt[a.id] ? `（${formatDate(settings.confirmedAt[a.id])}に確認）` : '（まだ確認していません）'}
               </Text>
               <Input
                 value={texts[a.id] ?? ''}
@@ -81,7 +91,9 @@ export default function BalanceCheckScreen() {
                 placeholder={a.type === 'credit' ? '実際の未払い額' : '実際の残高'}
                 accessibilityLabel={`${a.name}の実際の残高`}
               />
-              {diff !== null ? (
+              {diff !== null && isFirst(a.id) ? (
+                <Text style={styles.first}>初めての確認なので、ずれは記録せずにこの残高から始めます</Text>
+              ) : diff !== null ? (
                 <Text style={[styles.diff, { color: diff === 0 ? colors.income : colors.warning }]}>
                   {diffText(diff, a.type === 'credit')}
                 </Text>
@@ -126,5 +138,6 @@ const styles = StyleSheet.create({
   accountType: { fontSize: 12, color: colors.subText },
   recorded: { fontSize: 13, color: colors.subText },
   diff: { fontSize: 14, fontWeight: '600' },
+  first: { fontSize: 13, color: colors.primary },
   total: { fontSize: 20, fontWeight: '700' },
 });

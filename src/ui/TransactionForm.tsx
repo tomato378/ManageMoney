@@ -70,6 +70,9 @@ export function TransactionForm({
       toAccountId: kind === 'transfer' ? toAccountId : null,
       date,
       memo: memo.trim(),
+      // 明細から取り込んだ目印は残す（消すと次の取り込みで二重になる）
+      origin: before?.origin ?? initial.origin,
+      importKeys: before?.importKeys ?? initial.importKeys,
     };
     saveTransaction(before, input);
     onDone();

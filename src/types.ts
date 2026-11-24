@@ -38,9 +38,18 @@ export interface Transaction {
   date: string;
   memo: string;
   createdAt: number;
+  /** どこから記録したか（なければ手入力） */
+  origin?: TransactionOrigin;
+  /** 明細から取り込んだ・明細と照合したときの行の目印。同じ行を二重に取り込まないために使う */
+  importKeys?: string[];
 }
 
+export type TransactionOrigin = 'manual' | 'receipt' | 'statement' | 'recurring' | 'adjustment';
+
 export type TransactionInput = Omit<Transaction, 'id' | 'createdAt'>;
+
+/** 取り込める明細CSVの種類 */
+export type StatementSource = 'saison' | 'olive-credit' | 'smbc' | 'paypay' | 'paypay-card' | 'sbi';
 
 export interface Budget {
   /** カテゴリ予算は categoryId、全体予算は TOTAL_BUDGET_ID */
@@ -72,6 +81,10 @@ export interface AppSettings {
   defaultAccountId: string | null;
   /** レシートの支払い方法ごとに、どの口座から払ったことにするか（未設定は defaultAccountId） */
   paymentAccountIds: Record<PaymentMethod, string | null>;
+  /** 明細CSVの種類ごとに、どの口座の明細として取り込むか */
+  statementAccountIds: Partial<Record<StatementSource, string>>;
+  /** 口座ごとに、最後に残高が正しいと確かめた日（残高チェック・残高つき明細の取り込み）。YYYY-MM-DD */
+  confirmedAt: Record<string, string>;
 }
 
 /** 毎月決まって入る収入・出る固定費。指定日を過ぎると自動で取引になる */

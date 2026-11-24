@@ -1,4 +1,7 @@
 import type { Account, AppSettings, Category, Goal, RecurringItem, Transaction, TransactionInput } from '@/types';
+import { today } from '@/lib/date';
+import type { Statement } from '@/lib/statements';
+import { importStatement as importRows, type AccountMap, type ImportResult } from './importStatement';
 import * as state from './state';
 import { update } from './store';
 
@@ -6,8 +9,9 @@ import { update } from './store';
 
 type WithOptionalId<T extends { id: string }> = Omit<T, 'id'> & { id?: string };
 
+/** 画面から口座を保存する。残高を手で入れたら、その日を残高を確かめた日にする */
 export function saveAccount(account: WithOptionalId<Account>) {
-  update((d) => state.saveAccount(d, account));
+  update((d) => state.saveAccount(d, account, today()));
 }
 
 export function archiveAccount(id: string) {
@@ -75,4 +79,45 @@ export function deleteRecurring(id: string) {
 
 export function postDueRecurring(today: string) {
   update((d) => state.postDueRecurring(d, today));
+}
+
+/** 明細の取り込みで、口座を既存のものにするか新しく作るか */
+export type AccountChoice = { accountId: string } | { create: Pick<Account, 'name' | 'type'> };
+
+/**
+ * 明細を取り込む。必要なら口座を作り、明細の種類と口座の対応を覚えておく（次回から自動で選ばれる）。
+ */
+export function importStatement(statement: Statement, choices: Partial<Record<keyof AccountMap, AccountChoice>>): ImportResult {
+  let result: ImportResult = { added: 0, matched: 0, skipped: 0, unresolved: 0 };
+  update((d) => {
+    let next = d;
+    const map: AccountMap = {};
+    for (const [key, choice] of Object.entries(choices) as [keyof AccountMap, AccountChoice][]) {
+      // 同じ画面で先に取り込んだ別の明細が、もうこの口座を作っていることがある
+      const already = key === 'cash' ? undefined : next.settings.statementAccountIds[key];
+      if ('accountId' in choice) {
+        map[key] = choice.accountId;
+      } else if (already && next.accounts.some((a) => a.id === already && !a.archived)) {
+        map[key] = already;
+      } else {
+        const id = state.newId();
+        next = state.saveAccount(next, {
+          id,
+          ...choice.create,
+          balance: 0,
+          sortOrder: next.accounts.length,
+          archived: false,
+        });
+        map[key] = id;
+      }
+    }
+    const { cash: _cash, ...sources } = map;
+    next = state.updateSettings(next, {
+      statementAccountIds: { ...next.settings.statementAccountIds, ...sources },
+    });
+    const imported = importRows(next, statement, map);
+    result = imported.result;
+    return imported.data;
+  });
+  return result;
 }

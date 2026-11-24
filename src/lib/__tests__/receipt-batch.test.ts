@@ -68,6 +68,7 @@ it('読み取った文字から支出を作る', () => {
       toAccountId: null,
       date: '2026-11-03',
       memo: 'ローソン新宿店',
+      origin: 'receipt',
     },
   });
 });

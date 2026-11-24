@@ -4,8 +4,19 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useData, useMonthTransactions } from '@/data/DataProvider';
-import { assetHistory, expenseOfCategory, summarizeTransactions, totalAssets } from '@/lib/calc';
-import { addMonths, daysBetween, formatMonth, today } from '@/lib/date';
+import {
+  assetHistory,
+  expenseOfCategory,
+  isSplitRefund,
+  smallSpending,
+  spendingPace,
+  staleAccounts,
+  statementCoverage,
+  summarizeTransactions,
+  totalAssets,
+  type PaceLevel,
+} from '@/lib/calc';
+import { addDays, addMonths, formatMonth, today } from '@/lib/date';
 import { UNKNOWN_EXPENSE_ID } from '@/lib/defaults';
 import { formatYen } from '@/lib/money';
 import { AssetTrend } from '@/ui/AssetTrend';
@@ -15,7 +26,18 @@ import { TransactionRow } from '@/ui/rows';
 import { colors, radius, spacing } from '@/ui/theme';
 
 export default function HomeScreen() {
-  const { accounts, categories, transactions, recurring, balanceChecks, thisMonth } = useData();
+  const { accounts, categories, transactions, recurring, settings, thisMonth } = useData();
+  const todayDate = today();
+  const thisMonthTxs = useMonthTransactions(thisMonth);
+  // カードの明細が1週間以上前までしかなければ、そろっている日までで判定する
+  const coverage = useMemo(() => statementCoverage(accounts, transactions), [accounts, transactions]);
+  const judgeDate = coverage && coverage < addDays(todayDate, -7) ? coverage : todayDate;
+  const pace = useMemo(() => spendingPace(transactions, judgeDate), [transactions, judgeDate]);
+  const small = useMemo(() => smallSpending(transactions, todayDate), [transactions, todayDate]);
+  const stale = staleAccounts(accounts, settings.confirmedAt, todayDate);
+  const thisMonthSummary = summarizeTransactions(thisMonthTxs);
+  const unknownThisMonth = expenseOfCategory(thisMonthTxs, UNKNOWN_EXPENSE_ID);
+  const refunds = thisMonthTxs.filter(isSplitRefund).reduce((sum, t) => sum + t.amount, 0);
   const [month, setMonth] = useState(thisMonth);
   const monthTxs = useMonthTransactions(month);
   const summary = summarizeTransactions(monthTxs);
@@ -25,37 +47,64 @@ export default function HomeScreen() {
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
     .slice(0, 5);
 
-  const lastCheck = balanceChecks[balanceChecks.length - 1];
-  const checkCaption = lastCheck
-    ? `前回：${daysBetween(lastCheck.date, today()) === 0 ? '今日' : `${daysBetween(lastCheck.date, today())}日前`}`
-    : 'ずれを使途不明金として記録';
   const isNew = transactions.length === 0;
 
   return (
     <View style={styles.flex}>
       <Screen>
-        <Card style={styles.hero}>
-          <Text style={styles.heroLabel}>総資産</Text>
-          <Amount value={totalAssets(accounts)} size={32} color="#FFFFFF" />
-          <Text style={styles.heroCaption}>{accounts.length}口座</Text>
-        </Card>
+        <Verdict pace={pace} total={totalAssets(accounts)} asOf={judgeDate === todayDate ? null : judgeDate} />
 
-        <View style={styles.actions}>
-          <ActionButton
-            icon="camera"
-            title="レシートをまとめて撮る"
-            caption="撮ったら捨ててOK"
-            color={colors.primary}
-            onPress={() => router.push('/scan')}
-          />
-          <ActionButton
-            icon="wallet"
-            title="残高チェック"
-            caption={checkCaption}
-            color={colors.income}
-            onPress={() => router.push('/balance-check')}
-          />
-        </View>
+        {!isNew ? (
+          <Card>
+            <SectionTitle title="今月の気づき" />
+            <Insight
+              icon="cafe"
+              text={`1,000円以下の出費：${small.count}回・合計 ${formatYen(small.total)}`}
+              sub={
+                small.usualTotal !== null
+                  ? diffFromUsual(small.total, small.usualTotal)
+                  : '小さい出費も、積み重なるとけっこうな額になります'
+              }
+            />
+            <Insight
+              icon="help-circle"
+              text={`使途不明金：${formatYen(unknownThisMonth)}`}
+              sub={
+                unknownThisMonth > 0 && thisMonthSummary.expense > 0
+                  ? `支出の ${Math.round((unknownThisMonth / thisMonthSummary.expense) * 100)}%。レシートも明細もないお金です`
+                  : '残高チェックで、記録とのずれがここに出ます'
+              }
+            />
+            {refunds > 0 ? (
+              <Insight
+                icon="people"
+                text={`割り勘で戻ってきたお金：${formatYen(refunds)}`}
+                sub="支出から差し引いています。立て替えた分のカード明細がまだなら、一時的に支出が少なく見えます"
+              />
+            ) : null}
+          </Card>
+        ) : null}
+
+        <Card>
+          <SectionTitle title="やること" />
+          {stale.length > 0 ? (
+            stale.slice(0, 4).map((s) => (
+              <Todo
+                key={s.account.id}
+                icon="wallet"
+                text={`「${s.account.name}」の残高を${s.days === null ? 'まだ確かめていません' : `${s.days}日間確かめていません`}`}
+                onPress={() => router.push('/balance-check')}
+              />
+            ))
+          ) : (
+            <Text style={styles.allGood}>✅ 口座の残高はすべて1か月以内に確かめています</Text>
+          )}
+          <View style={styles.actions}>
+            <ActionButton icon="camera" title="レシートを撮る" color={colors.primary} onPress={() => router.push('/scan')} />
+            <ActionButton icon="document-text" title="明細を取り込む" color={colors.transfer} onPress={() => router.push('/import')} />
+            <ActionButton icon="wallet" title="残高チェック" color={colors.income} onPress={() => router.push('/balance-check')} />
+          </View>
+        </Card>
 
         {isNew ? (
           <Card>
@@ -74,6 +123,7 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
+        <SectionTitle title="くわしく" />
         <Card>
           <View style={styles.monthBar}>
             <Pressable onPress={() => setMonth(addMonths(month, -1))} hitSlop={12} accessibilityLabel="前の月">
@@ -127,13 +177,11 @@ export default function HomeScreen() {
 function ActionButton({
   icon,
   title,
-  caption,
   color,
   onPress,
 }: {
   icon: IconName;
   title: string;
-  caption: string;
   color: string;
   onPress: () => void;
 }) {
@@ -143,11 +191,77 @@ function ActionButton({
       style={({ pressed }) => [styles.action, { backgroundColor: color, opacity: pressed ? 0.8 : 1 }]}
       accessibilityRole="button"
     >
-      <Ionicons name={icon} size={28} color="#FFFFFF" />
+      <Ionicons name={icon} size={24} color="#FFFFFF" />
       <Text style={styles.actionTitle}>{title}</Text>
-      <Text style={styles.actionCaption} numberOfLines={1}>
-        {caption}
+    </Pressable>
+  );
+}
+
+const PACE_TEXT: Record<PaceLevel, { emoji: string; title: string; color: string }> = {
+  good: { emoji: '🟢', title: 'いつもより控えめ', color: colors.income },
+  normal: { emoji: '🟢', title: 'いつもどおり', color: colors.income },
+  caution: { emoji: '🟡', title: '少し使いすぎ', color: colors.warning },
+  over: { emoji: '🔴', title: '使いすぎ注意', color: colors.danger },
+};
+
+function diffFromUsual(current: number, usual: number): string {
+  const diff = current - usual;
+  if (diff === 0) return 'いつもの同じ時期と同じくらい';
+  return `いつもの同じ時期より ${formatYen(Math.abs(diff))} ${diff > 0 ? '多い' : '少ない'}`;
+}
+
+/** 今月の使い方の結論（いつもの月と比べて） */
+function Verdict({
+  pace,
+  total,
+  asOf,
+}: {
+  pace: ReturnType<typeof spendingPace>;
+  total: number;
+  /** カードの明細がそろっている日までで判定したとき、その日 */
+  asOf: string | null;
+}) {
+  const look = pace.level ? PACE_TEXT[pace.level] : null;
+  const [, m, d] = (asOf ?? '').split('-').map(Number);
+  return (
+    <Card style={[styles.verdict, { borderColor: look?.color ?? colors.border }]}>
+      <Text style={styles.verdictLabel}>{asOf ? `${m}月${d}日までのお金` : '今月のお金'}</Text>
+      <Text style={[styles.verdictTitle, { color: look?.color ?? colors.text }]}>
+        {look ? `${look.emoji} ${look.title}` : 'まだ比べられません'}
       </Text>
+      <Text style={styles.verdictText}>
+        {pace.usual !== null
+          ? `${asOf ? 'この月' : '今月'}の支出 ${formatYen(pace.current)} は、${diffFromUsual(pace.current, pace.usual)}`
+          : `今月の支出は ${formatYen(pace.current)}。記録が1か月分たまると、いつもの月と比べられます`}
+      </Text>
+      {asOf ? (
+        <Text style={styles.verdictSub}>
+          カードの明細がそろっている日までで比べています。新しい明細を取り込むと先まで見られます
+        </Text>
+      ) : null}
+      <Text style={styles.verdictSub}>総資産 {formatYen(total)}</Text>
+    </Card>
+  );
+}
+
+function Insight({ icon, text, sub }: { icon: IconName; text: string; sub: string }) {
+  return (
+    <View style={styles.insight}>
+      <Ionicons name={icon} size={20} color={colors.subText} />
+      <View style={styles.flex}>
+        <Text style={styles.insightText}>{text}</Text>
+        <Text style={styles.insightSub}>{sub}</Text>
+      </View>
+    </View>
+  );
+}
+
+function Todo({ icon, text, onPress }: { icon: IconName; text: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.hint} accessibilityRole="button">
+      <Ionicons name={icon} size={20} color={colors.warning} />
+      <Text style={styles.hintText}>{text}</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.subText} />
     </Pressable>
   );
 }
@@ -177,13 +291,18 @@ function SummaryItem({ label, value, color }: { label: string; value: number; co
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  hero: { backgroundColor: colors.primary, gap: spacing.xs },
-  heroLabel: { color: '#DBEAFE', fontSize: 14 },
-  heroCaption: { color: '#DBEAFE', fontSize: 12 },
-  actions: { flexDirection: 'row', gap: spacing.md },
-  action: { flex: 1, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs, minHeight: 112 },
-  actionTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  actionCaption: { color: '#FFFFFFCC', fontSize: 12 },
+  verdict: { borderWidth: 2, gap: spacing.xs },
+  verdictLabel: { fontSize: 13, color: colors.subText },
+  verdictTitle: { fontSize: 26, fontWeight: '800' },
+  verdictText: { fontSize: 15, color: colors.text, lineHeight: 22 },
+  verdictSub: { fontSize: 13, color: colors.subText },
+  insight: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingVertical: spacing.xs },
+  insightText: { fontSize: 15, fontWeight: '600', color: colors.text },
+  insightSub: { fontSize: 12, color: colors.subText, lineHeight: 18 },
+  allGood: { fontSize: 14, color: colors.income },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  action: { flex: 1, borderRadius: radius.md, padding: spacing.md, gap: spacing.xs, alignItems: 'center' },
+  actionTitle: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   hint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   hintText: { flex: 1, fontSize: 14, color: colors.text },
   hintDone: { color: colors.subText, textDecorationLine: 'line-through' },

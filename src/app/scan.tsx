@@ -393,6 +393,7 @@ function ReviewCard({ item, onResolve }: { item: ScanItem; onResolve: (input: Tr
                 categoryId,
                 accountId,
                 toAccountId: null,
+                origin: 'receipt',
               })
             }
           />

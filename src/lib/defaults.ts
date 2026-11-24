@@ -3,6 +3,10 @@ import type { Account, AccountType, AppSettings, Category } from '@/types';
 /** 残高チェックでずれを記録するカテゴリ */
 export const UNKNOWN_EXPENSE_ID = 'unknown';
 export const UNKNOWN_INCOME_ID = 'unknown-income';
+/** 立替・割り勘。送ったお金は支出、受け取ったお金（収入として記録）はこのカテゴリの支出から差し引く */
+export const SPLIT_ID = 'split';
+/** 銀行・ATM の手数料 */
+export const FEE_ID = 'fee';
 
 /** 初回に作るカテゴリ。ID を固定して二重作成を防ぐ */
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -17,6 +21,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'medical', name: '医療', kind: 'expense', icon: 'medkit', color: '#EF4444', sortOrder: 8 },
   { id: 'other-expense', name: 'その他', kind: 'expense', icon: 'ellipsis-horizontal', color: '#6B7280', sortOrder: 9 },
   { id: UNKNOWN_EXPENSE_ID, name: '使途不明金', kind: 'expense', icon: 'help-circle', color: '#9CA3AF', sortOrder: 10 },
+  { id: SPLIT_ID, name: '立替・割り勘', kind: 'expense', icon: 'people', color: '#F472B6', sortOrder: 11 },
+  { id: FEE_ID, name: '手数料', kind: 'expense', icon: 'cash', color: '#78716C', sortOrder: 12 },
   { id: 'salary', name: '給与', kind: 'income', icon: 'cash', color: '#16A34A', sortOrder: 0 },
   { id: 'side-job', name: '副業', kind: 'income', icon: 'briefcase', color: '#0EA5E9', sortOrder: 1 },
   { id: 'other-income', name: 'その他収入', kind: 'income', icon: 'gift', color: '#84CC16', sortOrder: 2 },
@@ -36,6 +42,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   quickCategoryIds: ['food', 'daily', 'transport', 'hobby'],
   defaultAccountId: DEFAULT_ACCOUNT.id,
   paymentAccountIds: { cash: DEFAULT_ACCOUNT.id, credit: null, emoney: null },
+  statementAccountIds: {},
+  confirmedAt: {},
 };
 
 export const ACCOUNT_TYPES: { type: AccountType; label: string; icon: string }[] = [

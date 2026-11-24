@@ -47,6 +47,7 @@ export default function ReceiptScreen() {
         date: fields.date ?? base.date,
         memo: fields.storeName ?? '',
         categoryId: guessCategoryId(text, categories),
+        origin: 'receipt',
       };
       const missing = [fields.amount === null && '金額', fields.date === null && '日付'].filter(
         (m): m is string => !!m,

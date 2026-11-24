@@ -1,5 +1,6 @@
 import type { Account, AccountType, Budget, Category, Goal, Transaction, TransactionInput } from '@/types';
-import { addMonths, monthOf, monthRange, monthsUntil } from './date';
+import { addMonths, daysBetween, dayInMonth, monthOf, monthRange, monthsUntil } from './date';
+import { SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
 
 type BalanceAffecting = Pick<TransactionInput, 'kind' | 'amount' | 'accountId' | 'toAccountId'>;
 
@@ -52,12 +53,18 @@ export interface MonthSummary {
   net: number;
 }
 
-/** 振替は収支に含めない */
+/** 割り勘で受け取ったお金。収入ではなく、立替・割り勘の支出から差し引く */
+export function isSplitRefund(tx: Pick<Transaction, 'kind' | 'categoryId'>): boolean {
+  return tx.kind === 'income' && tx.categoryId === SPLIT_ID;
+}
+
+/** 振替は収支に含めない。割り勘の受け取りは支出から差し引く */
 export function summarizeTransactions(txs: Transaction[]): MonthSummary {
   let income = 0;
   let expense = 0;
   for (const tx of txs) {
-    if (tx.kind === 'income') income += tx.amount;
+    if (isSplitRefund(tx)) expense -= tx.amount;
+    else if (tx.kind === 'income') income += tx.amount;
     else if (tx.kind === 'expense') expense += tx.amount;
   }
   return { income, expense, net: income - expense };
@@ -72,11 +79,14 @@ export interface CategoryTotal {
 export function expenseByCategory(txs: Transaction[]): CategoryTotal[] {
   const totals = new Map<string | null, number>();
   for (const tx of txs) {
-    if (tx.kind !== 'expense') continue;
-    totals.set(tx.categoryId, (totals.get(tx.categoryId) ?? 0) + tx.amount);
+    const amount = tx.kind === 'expense' ? tx.amount : isSplitRefund(tx) ? -tx.amount : 0;
+    if (amount === 0) continue;
+    totals.set(tx.categoryId, (totals.get(tx.categoryId) ?? 0) + amount);
   }
   return [...totals.entries()]
     .map(([categoryId, amount]) => ({ categoryId, amount }))
+    // 割り勘で立て替えた分が多く戻ってきた月はマイナスになるので出さない
+    .filter((t) => t.amount > 0)
     .sort((a, b) => b.amount - a.amount);
 }
 
@@ -184,4 +194,120 @@ export function assetHistory(accounts: Account[], txs: Transaction[], thisMonth:
 /** 支出のうち、指定したカテゴリ（使途不明金など）の合計 */
 export function expenseOfCategory(txs: Transaction[], categoryId: string): number {
   return txs.filter((t) => t.kind === 'expense' && t.categoryId === categoryId).reduce((sum, t) => sum + t.amount, 0);
+}
+
+/** 月初から day 日までの取引 */
+function untilDay(txs: Transaction[], month: string, day: number): Transaction[] {
+  const end = dayInMonth(month, day);
+  return txs.filter((t) => t.date >= `${month}-01` && t.date <= end);
+}
+
+/** 記録のある過去の月（新しい順に最大 months か月） */
+function pastMonthsWithData(txs: Transaction[], thisMonth: string, months: number): string[] {
+  const withData = new Set(txs.map((t) => monthOf(t.date)));
+  const result: string[] = [];
+  for (let i = 1; i <= months; i++) {
+    const m = addMonths(thisMonth, -i);
+    if (withData.has(m)) result.push(m);
+  }
+  return result;
+}
+
+export type PaceLevel = 'good' | 'normal' | 'caution' | 'over';
+
+export interface SpendingPace {
+  /** 今月、月初から今日までの支出 */
+  current: number;
+  /** 過去の月の、月初から同じ日までの支出の平均。比べる月がなければ null */
+  usual: number | null;
+  /** 比べた月の数 */
+  months: number;
+  level: PaceLevel | null;
+}
+
+/**
+ * 今月の使い方を「いつもの月」と比べる。月の途中でも公平になるよう、過去の月も月初から同じ日までで比べる。
+ * いつもより 1割以上少なければ good、1割以上多ければ caution、2割5分以上多ければ over。
+ */
+export function spendingPace(txs: Transaction[], today: string, months = 3): SpendingPace {
+  const thisMonth = monthOf(today);
+  const day = Number(today.slice(8, 10));
+  const current = summarizeTransactions(untilDay(txs, thisMonth, day)).expense;
+  const past = pastMonthsWithData(txs, thisMonth, months);
+  if (past.length === 0) return { current, usual: null, months: 0, level: null };
+  const usual = Math.round(
+    past.reduce((sum, m) => sum + summarizeTransactions(untilDay(txs, m, day)).expense, 0) / past.length,
+  );
+  let level: PaceLevel = 'normal';
+  if (usual <= 0) level = current > 0 ? 'caution' : 'normal';
+  else if (current >= usual * 1.25) level = 'over';
+  else if (current >= usual * 1.1) level = 'caution';
+  else if (current <= usual * 0.9) level = 'good';
+  return { current, usual, months: past.length, level };
+}
+
+/** 割り勘・使途不明金をのぞいた、ふつうの買い物の支出 */
+function isPurchase(t: Transaction): boolean {
+  return t.kind === 'expense' && t.categoryId !== SPLIT_ID && t.categoryId !== UNKNOWN_EXPENSE_ID;
+}
+
+export interface SmallSpending {
+  count: number;
+  total: number;
+  /** いつもの月の同じ時期の合計（比べる月がなければ null） */
+  usualTotal: number | null;
+}
+
+/** 1回 limit 円以下の小さい出費の積み重ね（今月の月初から今日まで） */
+export function smallSpending(txs: Transaction[], today: string, limit = 1000, months = 3): SmallSpending {
+  const thisMonth = monthOf(today);
+  const day = Number(today.slice(8, 10));
+  const small = (list: Transaction[]) => list.filter((t) => isPurchase(t) && t.amount <= limit);
+  const now = small(untilDay(txs, thisMonth, day));
+  const past = pastMonthsWithData(txs, thisMonth, months);
+  const usualTotal =
+    past.length === 0
+      ? null
+      : Math.round(
+          past.reduce((sum, m) => sum + small(untilDay(txs, m, day)).reduce((s, t) => s + t.amount, 0), 0) / past.length,
+        );
+  return { count: now.length, total: now.reduce((s, t) => s + t.amount, 0), usualTotal };
+}
+
+export interface StaleAccount {
+  account: Account;
+  /** 最後に残高を確かめてからの日数。一度も確かめていなければ null */
+  days: number | null;
+}
+
+/** 残高を days 日以上確かめていない口座（古い順） */
+export function staleAccounts(
+  accounts: Account[],
+  confirmedAt: Record<string, string>,
+  today: string,
+  days = 30,
+): StaleAccount[] {
+  return activeAccounts(accounts)
+    .map((account) => {
+      const at = confirmedAt[account.id];
+      return { account, days: at ? daysBetween(at, today) : null };
+    })
+    .filter((s) => s.days === null || s.days >= days)
+    .sort((a, b) => (b.days ?? Infinity) - (a.days ?? Infinity));
+}
+
+/**
+ * カードの明細がそろっている最後の日。
+ * カードの明細は確定してから出るので、今月のカード払いはまだ記録されていないことが多い。
+ * 明細を取り込んだクレカごとに最後の利用日を見て、いちばん古いものを返す（明細を取り込んだクレカがなければ null）。
+ */
+export function statementCoverage(accounts: Account[], txs: Transaction[]): string | null {
+  const latest = new Map<string, string>();
+  const cards = new Set(activeAccounts(accounts).filter((a) => a.type === 'credit').map((a) => a.id));
+  for (const t of txs) {
+    if (!t.accountId || !cards.has(t.accountId) || !t.importKeys?.length || t.kind !== 'expense') continue;
+    if ((latest.get(t.accountId) ?? '') < t.date) latest.set(t.accountId, t.date);
+  }
+  if (latest.size === 0) return null;
+  return [...latest.values()].sort()[0];
 }

@@ -1,5 +1,5 @@
 import type { AppData } from '@/data/state';
-import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID } from './defaults';
+import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, FEE_ID, SPLIT_ID, UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID } from './defaults';
 
 const APP = 'managemoney';
 const VERSION = 1;
@@ -21,7 +21,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 const OPTIONAL_LIST_KEYS = ['recurring', 'balanceChecks'] as const;
 
 /** 残高チェックに必要なので、古いデータにもなければ足すカテゴリ */
-const REQUIRED_CATEGORY_IDS = [UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID];
+const REQUIRED_CATEGORY_IDS = [UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID, SPLIT_ID, FEE_ID];
 
 /**
  * 保存データ・バックアップの中身として形が正しければ AppData に整えて返す。
@@ -49,6 +49,8 @@ export function normalizeData(value: unknown): AppData | null {
       ...DEFAULT_SETTINGS,
       ...settings,
       paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds, ...paymentAccountIds },
+      statementAccountIds: isObject(settings.statementAccountIds) ? settings.statementAccountIds : {},
+      confirmedAt: isObject(settings.confirmedAt) ? settings.confirmedAt : {},
     } as AppData['settings'],
   };
 }
