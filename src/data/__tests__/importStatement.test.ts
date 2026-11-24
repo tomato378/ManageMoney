@@ -63,16 +63,16 @@ describe('明細の取り込み', () => {
   it('PayPay のカード払いと PayPayカードの明細は1件にまとめる', () => {
     const paypay: Statement = {
       source: 'paypay',
-      rows: [{ date: '2026-11-17', amount: 1180, kind: 'expense', name: 'Rocket Now', source: 'paypay-card', key: 'paypay:1:out' }],
+      rows: [{ date: '2026-11-17', amount: 1180, kind: 'expense', name: 'Delivery Shop', source: 'paypay-card', key: 'paypay:1:out' }],
     };
     const ppcard: Statement = {
       source: 'paypay-card',
-      rows: [{ date: '2026-11-18', amount: 1180, kind: 'expense', name: 'ROCKET NOW', key: 'paypay-card:x' }],
+      rows: [{ date: '2026-11-18', amount: 1180, kind: 'expense', name: 'DELIVERY SHOP', key: 'paypay-card:x' }],
     };
     const d = importStatement(importStatement(base(), paypay, map).data, ppcard, map);
     expect(d.result.matched).toBe(1);
     expect(d.data.transactions).toHaveLength(1);
-    expect(d.data.transactions[0].memo).toBe('Rocket Now');
+    expect(d.data.transactions[0].memo).toBe('Delivery Shop');
     expect(balance(d.data, 'ppcard')).toBe(-1180);
   });
 
@@ -110,7 +110,7 @@ describe('明細の取り込み', () => {
   it('割り勘で受け取ったお金は割り勘カテゴリの入金として記録する', () => {
     const paypay: Statement = {
       source: 'paypay',
-      rows: [{ date: '2026-11-20', amount: 1557, kind: 'income', name: 'よるさんから受け取り', categoryId: 'split', key: 'paypay:9:in' }],
+      rows: [{ date: '2026-11-20', amount: 1557, kind: 'income', name: 'たろうさんから受け取り', categoryId: 'split', key: 'paypay:9:in' }],
     };
     const { data } = importStatement(base(), paypay, map);
     expect(data.transactions[0]).toMatchObject({ kind: 'income', categoryId: 'split', accountId: 'pp' });
@@ -120,11 +120,11 @@ describe('明細の取り込み', () => {
     const bank: Statement = {
       source: 'smbc',
       rows: [{ date: '2026-11-09', amount: 100, kind: 'expense', name: 'デビット払い', key: 'smbc:d' }],
-      balance: 36923,
+      balance: 50000,
       lastDate: '2026-11-09',
     };
     const { data } = importStatement(base(), bank, map);
-    expect(balance(data, 'bank')).toBe(36923);
+    expect(balance(data, 'bank')).toBe(50000);
     expect(data.settings.confirmedAt.bank).toBe('2026-11-09');
   });
 
