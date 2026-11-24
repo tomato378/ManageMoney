@@ -56,6 +56,7 @@ export default function ImportScreen() {
         </Text>
         <Text style={styles.note}>
           対応している明細：{Object.values(STATEMENT_LABELS).filter((l) => !/PayPayカード|SBI/.test(l)).join('・')}
+          （PayPayカードでの支払いは PayPay の明細に入っています）
         </Text>
         <Text style={styles.note}>ファイルはこの端末の中で読むだけで、外部には送信されません。</Text>
         <Button title="CSVファイルを選ぶ" onPress={() => fileInput.current?.click()} />
