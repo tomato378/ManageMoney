@@ -1,9 +1,11 @@
 import { balanceDeltaDiff } from '@/lib/calc';
 import { addMonths, dayInMonth, monthOf } from '@/lib/date';
+import { payeeKey } from '@/lib/statements';
 import {
   DEFAULT_ACCOUNT,
   DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS,
+  SPECIAL_ID,
   UNKNOWN_EXPENSE_ID,
   UNKNOWN_INCOME_ID,
 } from '@/lib/defaults';
@@ -54,6 +56,7 @@ export function seedData(): AppData {
       paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds },
       statementAccountIds: {},
       otherPeople: [],
+      payeeCategories: {},
       confirmedAt: {},
     },
   };
@@ -278,6 +281,22 @@ export function postDueRecurring(data: AppData, today: string, now = Date.now())
     return { ...item, lastPostedMonth };
   });
   return changed ? { ...next, recurring } : data;
+}
+
+/**
+ * 明細から取り込んだ取引のカテゴリを直したとき、その振込先・店のカテゴリとして覚える。
+ * 同じ振込先で、まだ「その他」などのままの取引も同じカテゴリにそろえる。
+ */
+export function learnPayeeCategory(data: AppData, key: string, categoryId: string): AppData {
+  const [kind] = key.split(':');
+  const unset = new Set([null, 'other-expense', 'other-income', SPECIAL_ID]);
+  let next: AppData = { ...data, settings: { ...data.settings, payeeCategories: { ...data.settings.payeeCategories, [key]: categoryId } } };
+  for (const tx of data.transactions) {
+    if (tx.kind === 'transfer' || tx.kind !== kind || !tx.importKeys?.length || !unset.has(tx.categoryId) || tx.categoryId === categoryId) continue;
+    if (payeeKey(tx.kind, tx.memo) !== key) continue;
+    next = { ...next, transactions: next.transactions.map((t) => (t.id === tx.id ? { ...t, categoryId } : t)) };
+  }
+  return next;
 }
 
 // ---- 設定 ----

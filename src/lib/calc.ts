@@ -1,6 +1,6 @@
 import type { Account, AccountType, Budget, Category, Goal, Transaction, TransactionInput } from '@/types';
 import { addMonths, daysBetween, dayInMonth, monthOf, monthRange, monthsUntil } from './date';
-import { FEE_ID, SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
+import { FEE_ID, SPECIAL_ID, SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
 
 type BalanceAffecting = Pick<TransactionInput, 'kind' | 'amount' | 'accountId' | 'toAccountId'>;
 
@@ -237,11 +237,13 @@ export interface SpendingPace {
 export function spendingPace(txs: Transaction[], today: string, months = 3): SpendingPace {
   const thisMonth = monthOf(today);
   const day = Number(today.slice(8, 10));
-  const current = summarizeTransactions(untilDay(txs, thisMonth, day)).expense;
+  // めったにない大きな出費（学費など）は比べると判定が狂うので外す
+  const regular = txs.filter((t) => t.categoryId !== SPECIAL_ID);
+  const current = summarizeTransactions(untilDay(regular, thisMonth, day)).expense;
   const past = pastMonthsWithData(txs, thisMonth, months);
   if (past.length === 0) return { current, usual: null, months: 0, level: null };
   const usual = Math.round(
-    past.reduce((sum, m) => sum + summarizeTransactions(untilDay(txs, m, day)).expense, 0) / past.length,
+    past.reduce((sum, m) => sum + summarizeTransactions(untilDay(regular, m, day)).expense, 0) / past.length,
   );
   let level: PaceLevel = 'normal';
   if (usual <= 0) level = current > 0 ? 'caution' : 'normal';
@@ -253,7 +255,9 @@ export function spendingPace(txs: Transaction[], today: string, months = 3): Spe
 
 /** 割り勘・使途不明金をのぞいた、ふつうの買い物の支出 */
 function isPurchase(t: Transaction): boolean {
-  return t.kind === 'expense' && t.categoryId !== SPLIT_ID && t.categoryId !== UNKNOWN_EXPENSE_ID;
+  return (
+    t.kind === 'expense' && t.categoryId !== SPLIT_ID && t.categoryId !== UNKNOWN_EXPENSE_ID && t.categoryId !== SPECIAL_ID
+  );
 }
 
 export interface SmallSpending {

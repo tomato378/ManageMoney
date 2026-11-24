@@ -1,7 +1,8 @@
 import type { Statement } from '@/lib/statements';
 import type { TransactionInput } from '@/types';
 import { importStatement } from '../importStatement';
-import { saveAccount, saveRecurring, postDueRecurring, saveTransaction, seedData, type AppData } from '../state';
+import { payeeKey } from '@/lib/statements';
+import { learnPayeeCategory, saveAccount, saveRecurring, postDueRecurring, saveTransaction, seedData, type AppData } from '../state';
 
 function base(): AppData {
   let d = seedData();
@@ -161,6 +162,28 @@ describe('明細の取り込み', () => {
     };
     const { data } = importStatement(base(), sbi, { sbi: 'bank' }, Date.now(), ['スズキ']);
     expect(data.transactions).toEqual([expect.objectContaining({ kind: 'expense', amount: 3000, memo: 'スズキさんへ送金', accountId: 'bank' })]);
+  });
+
+  it('10万円以上の支出は「特別な出費」にする', () => {
+    const bank: Statement = {
+      source: 'sbi',
+      rows: [{ date: '2026-10-15', amount: 702000, kind: 'expense', name: '振込 ガク)サンプルガクエン', key: 'sbi:t' }],
+    };
+    expect(importStatement(base(), bank, map).data.transactions[0].categoryId).toBe('special');
+  });
+
+  it('直したカテゴリを振込先ごとに覚えて、同じ振込先の取引と次の取り込みに使う', () => {
+    const rent = (n: number, date: string): Statement => ({
+      source: 'sbi',
+      rows: [{ date, amount: 45000, kind: 'expense', name: `振込 カ)サンプルフドウサン${n}`, key: `sbi:r${n}` }],
+    });
+    let d = importStatement(base(), rent(1001, '2026-09-10'), map).data;
+    d = importStatement(d, rent(1002, '2026-10-10'), map).data;
+    expect(d.transactions.map((t) => t.categoryId)).toEqual(['other-expense', 'other-expense']);
+    d = learnPayeeCategory(d, payeeKey('expense', d.transactions[0].memo), 'housing');
+    expect(d.transactions.map((t) => t.categoryId)).toEqual(['housing', 'housing']);
+    d = importStatement(d, rent(1003, '2026-11-10'), map).data;
+    expect(d.transactions[2].categoryId).toBe('housing');
   });
 
   it('口座が決まっていない行は取り込まない', () => {

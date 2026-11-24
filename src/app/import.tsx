@@ -18,6 +18,7 @@ import {
   type Counterpart,
   type Statement,
 } from '@/lib/statements';
+import type { StatementSource } from '@/types';
 import { Button, Card, Chip, ChipRow, Screen, SectionTitle } from '@/ui/components';
 import { colors, spacing } from '@/ui/theme';
 
@@ -80,6 +81,9 @@ export default function ImportScreen() {
             key={f.id}
             file={f}
             statement={f.statement}
+            otherBanks={files
+              .map((x) => x.statement?.source)
+              .filter((s): s is StatementSource => !!s && BANKS.includes(s) && s !== f.statement!.source)}
             onImported={(result) => setFiles((list) => list.map((x) => (x.id === f.id ? { ...x, result } : x)))}
           />
         ) : (
@@ -93,13 +97,19 @@ export default function ImportScreen() {
   );
 }
 
+/** 残高つきの明細を出す銀行 */
+const BANKS: StatementSource[] = ['smbc', 'sbi'];
+
 function StatementCard({
   file,
   statement,
+  otherBanks,
   onImported,
 }: {
   file: LoadedFile;
   statement: Statement;
+  /** 一緒に選んだほかの銀行の明細（「自分の別の銀行口座」はたぶんこれ） */
+  otherBanks: StatementSource[];
   onImported: (result: ImportResult) => void;
 }) {
   const { accounts, settings } = useData();
@@ -109,7 +119,12 @@ function StatementCard({
     return Object.fromEntries(
       needed.map((target) => {
         const id = target === statement.source ? own : guessAccount(target, accounts, settings, own);
-        return [target, id ? { accountId: id } : { create: NEW_ACCOUNT_FOR[target] }];
+        if (id) return [target, { accountId: id }];
+        // まだない別の銀行口座は、一緒に選んだ銀行の明細の口座として作る（あとでその明細を取り込むと同じ口座になる）
+        if (target === 'self-bank' && otherBanks[0]) {
+          return [target, { create: NEW_ACCOUNT_FOR[otherBanks[0]], as: otherBanks[0] }];
+        }
+        return [target, { create: NEW_ACCOUNT_FOR[target] }];
       }),
     );
   });
@@ -187,7 +202,7 @@ function StatementCard({
                     />
                   ))}
                   <Chip
-                    label={`＋ 新しく作る（${NEW_ACCOUNT_FOR[target].name}）`}
+                    label={`＋ 新しく作る（${choice && 'create' in choice ? choice.create.name : NEW_ACCOUNT_FOR[target].name}）`}
                     selected={!!choice && 'create' in choice}
                     onPress={() => setChoices({ ...choices, [target]: { create: NEW_ACCOUNT_FOR[target] } })}
                   />

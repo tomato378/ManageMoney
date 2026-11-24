@@ -91,6 +91,8 @@ export interface AppSettings {
   statementAccountIds: Partial<Record<AccountRole, string>>;
   /** ことら・振込の相手のうち、自分ではない人の名前（取り込むときに「他の人」を選んだもの） */
   otherPeople: string[];
+  /** 振込先・店ごとに覚えたカテゴリ。キーは「支出か収入:振込先」 */
+  payeeCategories: Record<string, string>;
   /** 口座ごとに、最後に残高が正しいと確かめた日（残高チェック・残高つき明細の取り込み）。YYYY-MM-DD */
   confirmedAt: Record<string, string>;
 }

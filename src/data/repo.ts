@@ -1,6 +1,6 @@
-import type { Account, AppSettings, Category, Goal, RecurringItem, Transaction, TransactionInput } from '@/types';
+import type { Account, AccountRole, AppSettings, Category, Goal, RecurringItem, Transaction, TransactionInput } from '@/types';
 import { today } from '@/lib/date';
-import type { Statement } from '@/lib/statements';
+import { payeeKey, type Statement } from '@/lib/statements';
 import { importStatement as importRows, type AccountMap, type ImportResult } from './importStatement';
 import * as state from './state';
 import { update } from './store';
@@ -26,8 +26,14 @@ export function deleteCategory(id: string) {
   update((d) => state.deleteCategory(d, id));
 }
 
+/** 取引を保存する。明細から取り込んだもののカテゴリを直したら、その振込先のカテゴリとして覚える */
 export function saveTransaction(before: Transaction | null, input: TransactionInput) {
-  update((d) => state.saveTransaction(d, before, input));
+  update((d) => {
+    const next = state.saveTransaction(d, before, input);
+    const changed = before?.importKeys?.length && input.categoryId && input.categoryId !== before.categoryId;
+    if (!changed || input.kind === 'transfer' || !input.memo) return next;
+    return state.learnPayeeCategory(next, payeeKey(input.kind, before.memo || input.memo), input.categoryId!);
+  });
 }
 
 /** 新しい取引を保存して、その ID を返す */
@@ -82,7 +88,10 @@ export function postDueRecurring(today: string) {
 }
 
 /** 明細の取り込みで、口座を既存のものにするか新しく作るか */
-export type AccountChoice = { accountId: string } | { create: Pick<Account, 'name' | 'type'> };
+export type AccountChoice =
+  | { accountId: string }
+  /** as を付けると、その明細の種類の口座としても覚える（「自分の別の銀行口座」を SBI として作るなど） */
+  | { create: Pick<Account, 'name' | 'type'>; as?: AccountRole };
 
 /**
  * 明細を取り込む。必要なら口座を作り、明細の種類と口座の対応を覚えておく（次回から自動で選ばれる）。
@@ -99,7 +108,8 @@ export function importStatement(
     const map: AccountMap = {};
     for (const [key, choice] of Object.entries(choices) as [keyof AccountMap, AccountChoice][]) {
       // 同じ画面で先に取り込んだ別の明細が、もうこの口座を作っていることがある
-      const already = key === 'cash' ? undefined : next.settings.statementAccountIds[key];
+      const role = 'create' in choice && choice.as ? choice.as : key;
+      const already = role === 'cash' ? undefined : next.settings.statementAccountIds[role];
       if ('accountId' in choice) {
         map[key] = choice.accountId;
       } else if (already && next.accounts.some((a) => a.id === already && !a.archived)) {
@@ -114,6 +124,11 @@ export function importStatement(
           archived: false,
         });
         map[key] = id;
+        if (role !== key && role !== 'cash') {
+          next = state.updateSettings(next, {
+            statementAccountIds: { ...next.settings.statementAccountIds, [role]: id },
+          });
+        }
       }
     }
     const { cash: _cash, ...sources } = map;

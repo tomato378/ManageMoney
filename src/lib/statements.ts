@@ -418,3 +418,15 @@ export function guessAccount(
   if (target === 'cash') return active.find((a) => a.type === 'cash')?.id ?? null;
   return null;
 }
+
+/**
+ * 振込先・店の名前を、カテゴリを覚えるためのキーにする。
+ * 「振込 」「QP/」などの前置きと、毎回変わる末尾の番号は外す（フロンテイア1475707 → フロンテイア）。
+ */
+export function payeeKey(kind: 'income' | 'expense', name: string): string {
+  const payee = normalizeName(name)
+    .replace(/^(振込|給与|QP\/|ID\/)\s*/i, '')
+    .replace(/\s*\d{3,}$/, '')
+    .trim();
+  return `${kind}:${payee}`;
+}

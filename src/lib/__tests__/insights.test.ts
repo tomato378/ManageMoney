@@ -31,6 +31,10 @@ describe('いつもの月との比較', () => {
   it('1割以上少なければ控えめ', () => {
     expect(spendingPace([...past, tx('2026-11-03', 20000)], '2026-11-10').level).toBe('good');
   });
+  it('特別な出費（学費など）は比べない', () => {
+    const pace = spendingPace([...past, tx('2026-11-03', 26000), tx('2026-11-04', 700000, 'expense', 'special')], '2026-11-10');
+    expect(pace.current).toBe(26000);
+  });
   it('過去の記録がなければ比べない', () => {
     expect(spendingPace([tx('2026-11-03', 1000)], '2026-11-10')).toMatchObject({ usual: null, level: null });
   });

@@ -1,6 +1,7 @@
 import { daysBetween } from '@/lib/date';
 import { guessCategoryId } from '@/lib/receipt';
-import type { Counterpart, Statement, StatementRow } from '@/lib/statements';
+import { SPECIAL_ID } from '@/lib/defaults';
+import { payeeKey, type Counterpart, type Statement, type StatementRow } from '@/lib/statements';
 import type { Transaction, TransactionInput } from '@/types';
 import { newId, saveTransaction, type AppData } from './state';
 
@@ -145,10 +146,7 @@ export function importStatement(
       : {
           kind: row.kind === 'income' ? 'income' : 'expense',
           amount: row.amount,
-          categoryId:
-            row.categoryId ??
-            (row.kind === 'expense' ? guessCategoryId(row.name, next.categories) : null) ??
-            fallbackCategory(next, row.kind === 'income' ? 'income' : 'expense'),
+          categoryId: categoryFor(next, row),
           accountId,
           toAccountId: null,
           date: row.date,
@@ -197,6 +195,23 @@ function toPersonPayment(row: StatementRow): StatementRow {
 function stripMeta(tx: TransactionInput & Partial<Pick<Transaction, 'id' | 'createdAt'>>): TransactionInput {
   const { id: _id, createdAt: _createdAt, ...input } = tx;
   return input;
+}
+
+/** 大きな出費は「特別な出費」にする（学費・家電など。いつもの月との比較から外す） */
+const SPECIAL_AMOUNT = 100_000;
+
+/** 明細の行のカテゴリ：決まっているもの → 前に覚えた振込先 → 店名から推測 → 大きな出費 → その他 */
+function categoryFor(data: AppData, row: StatementRow): string | null {
+  const kind = row.kind === 'income' ? 'income' : 'expense';
+  if (row.categoryId) return row.categoryId;
+  const learned = data.settings.payeeCategories[payeeKey(kind, row.name)];
+  if (learned && data.categories.some((c) => c.id === learned)) return learned;
+  if (kind === 'expense') {
+    const guessed = guessCategoryId(row.name, data.categories);
+    if (guessed) return guessed;
+    if (row.amount >= SPECIAL_AMOUNT && data.categories.some((c) => c.id === SPECIAL_ID)) return SPECIAL_ID;
+  }
+  return fallbackCategory(data, kind);
 }
 
 function fallbackCategory(data: AppData, kind: 'income' | 'expense'): string | null {
