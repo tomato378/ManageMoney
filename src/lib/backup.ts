@@ -51,6 +51,7 @@ export function normalizeData(value: unknown): AppData | null {
       paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds, ...paymentAccountIds },
       statementAccountIds: isObject(settings.statementAccountIds) ? settings.statementAccountIds : {},
       confirmedAt: isObject(settings.confirmedAt) ? settings.confirmedAt : {},
+      otherPeople: Array.isArray(settings.otherPeople) ? settings.otherPeople : [],
     } as AppData['settings'],
   };
 }

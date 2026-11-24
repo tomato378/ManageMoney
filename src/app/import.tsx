@@ -7,6 +7,7 @@ import { importStatement, type AccountChoice } from '@/data/repo';
 import { formatDate } from '@/lib/date';
 import { formatYen } from '@/lib/money';
 import {
+  COUNTERPART_LABELS,
   decodeCsv,
   guessAccount,
   NEW_ACCOUNT_FOR,
@@ -26,8 +27,6 @@ interface LoadedFile {
   statement: Statement | null;
   result?: ImportResult;
 }
-
-const COUNTERPART_LABELS: Record<Counterpart, string> = { ...STATEMENT_LABELS, cash: '財布（ATMの出し入れ）' };
 
 /**
  * カード会社・銀行・PayPay の明細CSVを取り込む画面。
@@ -55,7 +54,7 @@ export default function ImportScreen() {
           カード会社・銀行・PayPay のアプリやサイトからダウンロードした明細のCSVファイルを選んでください。何枚でもまとめて選べます。同じファイルを2回取り込んでも、二重には記録されません。
         </Text>
         <Text style={styles.note}>
-          対応している明細：{Object.values(STATEMENT_LABELS).filter((l) => !/PayPayカード|SBI/.test(l)).join('・')}
+          対応している明細：{Object.values(STATEMENT_LABELS).filter((l) => !/PayPayカード/.test(l)).join('・')}
           （PayPayカードでの支払いは PayPay の明細に入っています）
         </Text>
         <Text style={styles.note}>ファイルはこの端末の中で読むだけで、外部には送信されません。</Text>
@@ -105,14 +104,22 @@ function StatementCard({
 }) {
   const { accounts, settings } = useData();
   const needed = neededAccounts(statement);
-  const [choices, setChoices] = useState<Partial<Record<Counterpart, AccountChoice>>>(() =>
-    Object.fromEntries(
+  const [choices, setChoices] = useState<Partial<Record<Counterpart, AccountChoice>>>(() => {
+    const own = guessAccount(statement.source, accounts, settings);
+    return Object.fromEntries(
       needed.map((target) => {
-        const id = guessAccount(target, accounts, settings);
+        const id = target === statement.source ? own : guessAccount(target, accounts, settings, own);
         return [target, id ? { accountId: id } : { create: NEW_ACCOUNT_FOR[target] }];
       }),
-    ),
+    );
+  });
+  // ことら・振込の相手。前に「他の人」と選んだ人以外は、最初は自分として扱う
+  const persons = [...new Set(statement.rows.map((r) => r.person).filter((p): p is string => !!p))];
+  const [people, setPeople] = useState<Record<string, 'self' | 'other'>>(() =>
+    Object.fromEntries(persons.map((p) => [p, settings.otherPeople.includes(p) ? 'other' : 'self'])),
   );
+  // 全員「他の人」なら、自分の別の銀行口座は使わない
+  const shown = needed.filter((t) => t !== 'self-bank' || Object.values(people).includes('self'));
 
   const dates = statement.rows.map((r) => r.date).sort();
   const counts = {
@@ -148,7 +155,24 @@ function StatementCard({
 
       {!done ? (
         <>
-          {needed.map((target) => {
+          {persons.map((person) => (
+            <View key={person} style={styles.accountRow}>
+              <Text style={styles.accountLabel}>「{person}」とのことら・振込は</Text>
+              <ChipRow>
+                <Chip
+                  label="自分の口座間の移動"
+                  selected={people[person] === 'self'}
+                  onPress={() => setPeople({ ...people, [person]: 'self' })}
+                />
+                <Chip
+                  label="ほかの人への送金・入金"
+                  selected={people[person] === 'other'}
+                  onPress={() => setPeople({ ...people, [person]: 'other' })}
+                />
+              </ChipRow>
+            </View>
+          ))}
+          {shown.map((target) => {
             const choice = choices[target];
             return (
               <View key={target} style={styles.accountRow}>
@@ -171,7 +195,15 @@ function StatementCard({
               </View>
             );
           })}
-          <Button title="取り込む" onPress={() => onImported(importStatement(statement, choices))} />
+          <Button title="取り込む" onPress={() =>
+              onImported(
+                importStatement(
+                  statement,
+                  Object.fromEntries(Object.entries(choices).filter(([t]) => shown.includes(t as Counterpart))),
+                  people,
+                ),
+              )
+            } />
         </>
       ) : (
         <Text style={styles.ok}>

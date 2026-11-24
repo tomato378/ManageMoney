@@ -88,7 +88,7 @@ describe('三井住友銀行', () => {
     expect(s.rows.map((r) => [r.kind, r.name, r.counterpart ?? null, r.categoryId ?? null])).toEqual([
       ['expense', 'デビット払い', null, null],
       ['expense', 'デビット払い', null, null],
-      ['transfer-in', 'ATMで入金', 'cash', null],
+      ['transfer-in', 'ヤマダ タロウから入金', 'self-bank', null],
       ['expense', 'さくら大学 食堂', null, null],
       ['transfer-out', 'Olive クレジットの引き落とし', 'olive-credit', null],
       ['expense', 'ATM手数料', null, 'fee'],
@@ -131,5 +131,54 @@ describe('口座の推測', () => {
   });
   it('前に選んだ口座を優先', () => {
     expect(guessAccount('paypay-card', accounts, { ...settings, statementAccountIds: { 'paypay-card': 'pp' } })).toBe('pp');
+  });
+});
+
+const SBI = [
+  '"取引日","摘要","出金金額","入金金額","残高","メモ"',
+  '"2026/11/20","ことら ﾔﾏﾀﾞ ﾀﾛｳ","20000","","500000",""',
+  '"2026/11/17","振込手数料","","75","520000",""',
+  '"2026/11/17","振込手数料","75","","519925",""',
+  '"2026/11/10","振込 ｶ)ｻﾝﾌﾟﾙ","","50000","520000",""',
+  '"2026/11/07","満期解約 パワーダイレクト円定期30","","300100","470000",""',
+  '"2026/11/04","ｾｿﾞﾝ","18000","","169900",""',
+  '"2026/11/01","国税","39","","187900",""',
+  '"2026/11/01","税引前利息","","255","187939",""',
+  '"2026/10/05","ATM 現金入金（提携取引）","","5000","187684",""',
+  '"2026/09/23","PayPay","10000","","182684",""',
+  '"2026/09/10","給与 ｶ)ｻﾝﾌﾟﾙｼｮｳｼﾞ","","19833","192684",""',
+].join('\n');
+
+describe('SBI新生銀行', () => {
+  const s = parseStatement(SBI)!;
+  it('いちばん新しい残高を読む', () => {
+    expect(s.source).toBe('sbi');
+    expect(s.balance).toBe(500000);
+    expect(s.lastDate).toBe('2026-11-20');
+  });
+  it('ことら・手数料・定期・カードの引き落とし・ATM・チャージ・給与を分ける', () => {
+    expect(s.rows.map((r) => [r.kind, r.counterpart ?? null, r.categoryId ?? null, r.person ?? null])).toEqual([
+      ['transfer-out', 'self-bank', null, 'ヤマダ タロウ'],
+      ['income', null, 'fee', null],
+      ['expense', null, 'fee', null],
+      ['income', null, null, null],
+      ['transfer-in', 'savings', null, null],
+      ['transfer-out', 'saison', null, null],
+      ['expense', null, 'fee', null],
+      ['income', null, 'other-income', null],
+      ['transfer-in', 'cash', null, null],
+      ['transfer-out', 'paypay', null, null],
+      ['income', null, 'salary', null],
+    ]);
+  });
+  it('「自分の別の銀行口座」には、取り込む明細とは別の銀行を選ぶ', () => {
+    const accounts = [
+      { id: 'smbc', name: '三井住友銀行', type: 'bank' as const, archived: false },
+      { id: 'sbi', name: 'SBI新生銀行', type: 'bank' as const, archived: false },
+    ];
+    const settings = { statementAccountIds: {}, paymentAccountIds: { cash: null, credit: null, emoney: null } };
+    expect(guessAccount('sbi', accounts, settings)).toBe('sbi');
+    expect(guessAccount('self-bank', accounts, settings, 'sbi')).toBe('smbc');
+    expect(guessAccount('self-bank', accounts, settings, 'smbc')).toBe('sbi');
   });
 });

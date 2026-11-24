@@ -53,6 +53,7 @@ export function seedData(): AppData {
       quickCategoryIds: [...DEFAULT_SETTINGS.quickCategoryIds],
       paymentAccountIds: { ...DEFAULT_SETTINGS.paymentAccountIds },
       statementAccountIds: {},
+      otherPeople: [],
       confirmedAt: {},
     },
   };

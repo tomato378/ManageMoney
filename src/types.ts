@@ -51,6 +51,12 @@ export type TransactionInput = Omit<Transaction, 'id' | 'createdAt'>;
 /** 取り込める明細CSVの種類 */
 export type StatementSource = 'saison' | 'olive-credit' | 'smbc' | 'paypay' | 'paypay-card' | 'sbi';
 
+/**
+ * 明細を取り込むときに口座を決める相手。明細の種類に加えて
+ * 財布（ATM）・自分の別の銀行口座（ことら・振込）・定期預金
+ */
+export type AccountRole = StatementSource | 'cash' | 'self-bank' | 'savings';
+
 export interface Budget {
   /** カテゴリ予算は categoryId、全体予算は TOTAL_BUDGET_ID */
   id: string;
@@ -82,7 +88,9 @@ export interface AppSettings {
   /** レシートの支払い方法ごとに、どの口座から払ったことにするか（未設定は defaultAccountId） */
   paymentAccountIds: Record<PaymentMethod, string | null>;
   /** 明細CSVの種類ごとに、どの口座の明細として取り込むか */
-  statementAccountIds: Partial<Record<StatementSource, string>>;
+  statementAccountIds: Partial<Record<AccountRole, string>>;
+  /** ことら・振込の相手のうち、自分ではない人の名前（取り込むときに「他の人」を選んだもの） */
+  otherPeople: string[];
   /** 口座ごとに、最後に残高が正しいと確かめた日（残高チェック・残高つき明細の取り込み）。YYYY-MM-DD */
   confirmedAt: Record<string, string>;
 }

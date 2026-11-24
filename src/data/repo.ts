@@ -87,7 +87,12 @@ export type AccountChoice = { accountId: string } | { create: Pick<Account, 'nam
 /**
  * 明細を取り込む。必要なら口座を作り、明細の種類と口座の対応を覚えておく（次回から自動で選ばれる）。
  */
-export function importStatement(statement: Statement, choices: Partial<Record<keyof AccountMap, AccountChoice>>): ImportResult {
+export function importStatement(
+  statement: Statement,
+  choices: Partial<Record<keyof AccountMap, AccountChoice>>,
+  /** ことら・振込の相手ごとに、自分かどうか */
+  people: Record<string, 'self' | 'other'> = {},
+): ImportResult {
   let result: ImportResult = { added: 0, matched: 0, skipped: 0, unresolved: 0 };
   update((d) => {
     let next = d;
@@ -112,10 +117,16 @@ export function importStatement(statement: Statement, choices: Partial<Record<ke
       }
     }
     const { cash: _cash, ...sources } = map;
+    const others = new Set(next.settings.otherPeople);
+    for (const [name, who] of Object.entries(people)) {
+      if (who === 'other') others.add(name);
+      else others.delete(name);
+    }
     next = state.updateSettings(next, {
       statementAccountIds: { ...next.settings.statementAccountIds, ...sources },
+      otherPeople: [...others],
     });
-    const imported = importRows(next, statement, map);
+    const imported = importRows(next, statement, map, Date.now(), next.settings.otherPeople);
     result = imported.result;
     return imported.data;
   });

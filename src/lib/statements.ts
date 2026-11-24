@@ -1,12 +1,17 @@
-import type { Account, AccountType, AppSettings, StatementSource } from '@/types';
+import type { Account, AccountRole, AccountType, AppSettings, StatementSource } from '@/types';
 
 /**
  * カード会社・銀行・PayPay の明細CSVを読む。
  * 形式ごとに見分けて、行を「支出・収入・口座間の移動」に分ける。ポイントの動きなどお金でない行は捨てる。
  */
 
-/** 移動の相手。'cash' は財布（ATM の出し入れ） */
-export type Counterpart = StatementSource | 'cash';
+/**
+ * 移動の相手。
+ * - cash: 財布（ATM の出し入れ）
+ * - self-bank: 自分の別の銀行口座（ことら送金・自分あての振込）
+ * - savings: 定期預金
+ */
+export type Counterpart = AccountRole;
 
 export interface StatementRow {
   /** YYYY-MM-DD */
@@ -22,6 +27,11 @@ export interface StatementRow {
   /** 店名・取引の内容（全角・半角をそろえたもの） */
   name: string;
   counterpart?: Counterpart;
+  /**
+   * 送金の相手の名前（ことら・振込）。自分の名前なら口座間の移動、
+   * ほかの人なら支出・入金として取り込む（取り込むときに選ぶ）
+   */
+  person?: string;
   /** 決まっているカテゴリ（割り勘・手数料など）。なければ店名から推測する */
   categoryId?: string;
   /**
@@ -51,6 +61,13 @@ export const STATEMENT_LABELS: Record<StatementSource, string> = {
   paypay: 'PayPay',
   'paypay-card': 'PayPayカード',
   sbi: 'SBI新生銀行',
+};
+
+export const COUNTERPART_LABELS: Record<Counterpart, string> = {
+  ...STATEMENT_LABELS,
+  cash: '財布（ATMの出し入れ）',
+  'self-bank': '自分の別の銀行口座（ことら・振込）',
+  savings: '定期預金',
 };
 
 /**
@@ -202,7 +219,9 @@ function parseSmbc(rows: string[][]): Statement {
   return { source: 'smbc', rows: out, balance, lastDate };
 }
 
-function classifySmbc(raw: string, isOut: boolean): Pick<StatementRow, 'kind' | 'name' | 'counterpart' | 'categoryId'> {
+type Classified = Pick<StatementRow, 'kind' | 'name' | 'counterpart' | 'categoryId' | 'person'>;
+
+function classifySmbc(raw: string, isOut: boolean): Classified {
   // デビット（iD）：「V123456 店名/iD」。店名がない行もある
   const debit = raw.match(/^V\d+\s*(.*)$/);
   if (debit) {
@@ -212,7 +231,11 @@ function classifySmbc(raw: string, isOut: boolean): Pick<StatementRow, 'kind' | 
   if (/^カード手数料/.test(raw)) return { kind: 'expense', name: 'ATM手数料', categoryId: 'fee' };
   // ATM：引き出しは「カード ｾﾌﾞﾝ…」、入金は「CT 名前」
   if (isOut && /^カード\s/.test(raw)) return { kind: 'transfer-out', name: 'ATMで引き出し', counterpart: 'cash' };
-  if (!isOut && /^CT\s/.test(raw)) return { kind: 'transfer-in', name: 'ATMで入金', counterpart: 'cash' };
+  // 「CT 名前」はことら・振込での入金。自分からなら別の銀行口座からの移動
+  const ct = raw.match(/^CT\s+(.+)$/);
+  if (!isOut && ct) {
+    return { kind: 'transfer-in', name: `${ct[1]}から入金`, counterpart: 'self-bank', person: ct[1].trim() };
+  }
   if (isOut && /^ミツイスミトモカ-?ー?ド/.test(raw.replace(/\s/g, ''))) {
     return { kind: 'transfer-out', name: 'Olive クレジットの引き落とし', counterpart: 'olive-credit' };
   }
@@ -276,6 +299,49 @@ function parsePaypay(rows: string[][]): Statement {
   return { source: 'paypay', rows: out };
 }
 
+/** SBI新生銀行：「"取引日","摘要","出金金額","入金金額","残高","メモ"」。新しい順 */
+function parseSbi(rows: string[][]): Statement {
+  const out: StatementRow[] = [];
+  let balance: number | undefined;
+  let lastDate: string | undefined;
+  for (const r of rows.slice(1)) {
+    const date = toDate(r[0]);
+    if (!date) continue;
+    const out1 = toAmount(r[2]);
+    const amount = out1 ?? toAmount(r[3]);
+    if (!amount) continue;
+    const raw = normalizeName(r[1]);
+    const rest = r[4]?.replace(/[,\s]/g, '') ?? '';
+    if (/^-?\d+$/.test(rest) && (!lastDate || date > lastDate)) {
+      lastDate = date;
+      balance = Number(rest);
+    }
+    const key = `sbi:${date}:${amount}:${out1 ? 'out' : 'in'}:${raw}:${rest}`;
+    out.push({ ...classifySbi(raw, !!out1), date, amount, key });
+  }
+  return { source: 'sbi', rows: out, balance, lastDate };
+}
+
+function classifySbi(raw: string, isOut: boolean): Classified {
+  const io = (kind: 'out' | 'in') => (kind === 'out' ? 'transfer-out' : 'transfer-in');
+  const dir = isOut ? 'out' : 'in';
+  const kotora = raw.match(/^ことら\s*(.+)$/);
+  if (kotora) {
+    const person = kotora[1].trim();
+    return { kind: io(dir), name: isOut ? `${person}へ送金（ことら）` : `${person}から入金（ことら）`, counterpart: 'self-bank', person };
+  }
+  // 振込手数料は引かれたあと同じ額が戻ることがある（無料回数の範囲内）
+  if (/^振込手数料/.test(raw)) return { kind: isOut ? 'expense' : 'income', name: isOut ? '振込手数料' : '振込手数料の返金', categoryId: 'fee' };
+  if (/^ATM/.test(raw)) return { kind: io(dir), name: isOut ? 'ATMで引き出し' : 'ATMで入金', counterpart: 'cash' };
+  if (isOut && /^セゾン/.test(raw)) return { kind: 'transfer-out', name: 'セゾンカードの引き落とし', counterpart: 'saison' };
+  if (/^PayPay/i.test(raw)) return { kind: io(dir), name: isOut ? 'PayPayにチャージ' : 'PayPayから出金', counterpart: 'paypay' };
+  if (/定期/.test(raw)) return { kind: io(dir), name: isOut ? '定期預金に預け入れ' : '定期預金の満期・解約', counterpart: 'savings' };
+  if (!isOut && /^給与/.test(raw)) return { kind: 'income', name: raw.replace(/^給与\s*/, '給与 '), categoryId: 'salary' };
+  if (!isOut && /利息/.test(raw)) return { kind: 'income', name: '利息', categoryId: 'other-income' };
+  if (isOut && /^(国税|地方税)$/.test(raw)) return { kind: 'expense', name: `利息の${raw}`, categoryId: 'fee' };
+  return { kind: isOut ? 'expense' : 'income', name: raw };
+}
+
 /** 中身を見て形式を判別して読む。どれでもなければ null */
 export function parseStatement(text: string): Statement | null {
   const rows = parseCsv(text);
@@ -285,6 +351,7 @@ export function parseStatement(text: string): Statement | null {
   if (first.some((f) => /Olive/i.test(f))) return parseOliveCredit(rows);
   if (first[0] === '年月日' && first.includes('お引出し')) return parseSmbc(rows);
   if (first[0] === '取引日' && first.some((f) => f.includes('取引番号'))) return parsePaypay(rows);
+  if (first[0] === '取引日' && first[1] === '摘要' && first.includes('残高')) return parseSbi(rows);
   return null;
 }
 
@@ -308,6 +375,8 @@ export function neededAccounts(statement: Statement): Counterpart[] {
 /** 口座がないときに新しく作る口座 */
 export const NEW_ACCOUNT_FOR: Record<Counterpart, { name: string; type: AccountType }> = {
   cash: { name: '財布', type: 'cash' },
+  'self-bank': { name: '別の銀行口座', type: 'bank' },
+  savings: { name: '定期預金', type: 'bank' },
   saison: { name: 'セゾンカード', type: 'credit' },
   'olive-credit': { name: 'Olive クレジット', type: 'credit' },
   smbc: { name: '三井住友銀行', type: 'bank' },
@@ -318,6 +387,8 @@ export const NEW_ACCOUNT_FOR: Record<Counterpart, { name: string; type: AccountT
 
 const NAME_HINTS: Record<Counterpart, RegExp> = {
   cash: /財布|現金/,
+  'self-bank': /$^/,
+  savings: /定期/,
   saison: /セゾン|SAISON/i,
   'olive-credit': /Olive|オリーブ/i,
   smbc: /三井住友|SMBC/i,
@@ -334,10 +405,13 @@ export function guessAccount(
   target: Counterpart,
   accounts: Pick<Account, 'id' | 'name' | 'type' | 'archived'>[],
   settings: Pick<AppSettings, 'statementAccountIds' | 'paymentAccountIds'>,
+  /** 取り込む明細そのものの口座（「自分の別の銀行口座」にはこれ以外を選ぶ） */
+  ownAccountId?: string | null,
 ): string | null {
-  const active = accounts.filter((a) => !a.archived);
+  const active = accounts.filter((a) => !a.archived && a.id !== (target === 'self-bank' ? ownAccountId : undefined));
   const remembered = target === 'cash' ? settings.paymentAccountIds.cash : settings.statementAccountIds[target];
   if (remembered && active.some((a) => a.id === remembered)) return remembered;
+  if (target === 'self-bank') return active.find((a) => a.type === 'bank')?.id ?? null;
   const type = NEW_ACCOUNT_FOR[target].type;
   const byName = active.find((a) => a.type === type && NAME_HINTS[target].test(a.name));
   if (byName) return byName.id;

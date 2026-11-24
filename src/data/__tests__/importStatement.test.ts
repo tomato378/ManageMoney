@@ -137,6 +137,32 @@ describe('明細の取り込み', () => {
     expect(data.transactions).toHaveLength(2);
   });
 
+  it('自分あてのことらと、相手の銀行の入金は1件の移動にまとめる', () => {
+    const sbi: Statement = {
+      source: 'sbi',
+      rows: [{ date: '2026-11-06', amount: 20000, kind: 'transfer-out', name: '送金', counterpart: 'self-bank', person: 'ヤマダ タロウ', key: 'sbi:k' }],
+    };
+    const smbc: Statement = {
+      source: 'smbc',
+      rows: [{ date: '2026-11-06', amount: 20000, kind: 'transfer-in', name: '入金', counterpart: 'self-bank', person: 'ヤマダ タロウ', key: 'smbc:k' }],
+    };
+    let d = base();
+    d = saveAccount(d, { id: 'sbi', name: 'SBI', type: 'bank', balance: 100000, sortOrder: 0, archived: false });
+    d = importStatement(d, sbi, { sbi: 'sbi', 'self-bank': 'bank' }).data;
+    const second = importStatement(d, smbc, { smbc: 'bank', 'self-bank': 'sbi' });
+    expect(second.result.matched).toBe(1);
+    expect(second.data.transactions).toEqual([expect.objectContaining({ kind: 'transfer', accountId: 'sbi', toAccountId: 'bank' })]);
+  });
+
+  it('ほかの人とのことらは、支出・入金にする', () => {
+    const sbi: Statement = {
+      source: 'sbi',
+      rows: [{ date: '2026-11-06', amount: 3000, kind: 'transfer-out', name: '送金', counterpart: 'self-bank', person: 'スズキ', key: 'sbi:p' }],
+    };
+    const { data } = importStatement(base(), sbi, { sbi: 'bank' }, Date.now(), ['スズキ']);
+    expect(data.transactions).toEqual([expect.objectContaining({ kind: 'expense', amount: 3000, memo: 'スズキさんへ送金', accountId: 'bank' })]);
+  });
+
   it('口座が決まっていない行は取り込まない', () => {
     const { result } = importStatement(base(), card, {});
     expect(result.unresolved).toBe(2);

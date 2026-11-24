@@ -92,13 +92,16 @@ export function importStatement(
   statement: Statement,
   accounts: AccountMap,
   now = Date.now(),
+  /** ことら・振込の相手のうち自分ではない人。その行は口座間の移動ではなく支出・入金にする */
+  otherPeople: string[] = data.settings.otherPeople,
 ): { data: AppData; result: ImportResult } {
   const result: ImportResult = { added: 0, matched: 0, skipped: 0, unresolved: 0 };
   const used = new Set<string>();
   let next = data;
   const confirmedAt = data.settings.confirmedAt;
 
-  for (const row of statement.rows) {
+  for (const original of statement.rows) {
+    const row = original.person && otherPeople.includes(original.person) ? toPersonPayment(original) : original;
     const accountId = accounts[row.source ?? statement.source];
     const isTransfer = row.kind === 'transfer-out' || row.kind === 'transfer-in';
     const counterpartId = row.counterpart ? (accounts[row.counterpart] ?? null) : null;
@@ -181,6 +184,13 @@ export function importStatement(
     }
   }
   return { data: next, result };
+}
+
+/** 自分以外の人とのことら・振込は、口座間の移動ではなく支出（送金）・入金 */
+function toPersonPayment(row: StatementRow): StatementRow {
+  if (row.kind === 'transfer-out') return { ...row, kind: 'expense', counterpart: undefined, name: `${row.person}さんへ送金` };
+  if (row.kind === 'transfer-in') return { ...row, kind: 'income', counterpart: undefined, name: `${row.person}さんから入金` };
+  return row;
 }
 
 /** 照合で上書きするときに、取引の ID などを入力から外す */

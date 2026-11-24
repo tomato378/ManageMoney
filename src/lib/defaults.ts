@@ -43,6 +43,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultAccountId: DEFAULT_ACCOUNT.id,
   paymentAccountIds: { cash: DEFAULT_ACCOUNT.id, credit: null, emoney: null },
   statementAccountIds: {},
+  otherPeople: [],
   confirmedAt: {},
 };
 

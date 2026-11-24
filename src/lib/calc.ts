@@ -1,6 +1,6 @@
 import type { Account, AccountType, Budget, Category, Goal, Transaction, TransactionInput } from '@/types';
 import { addMonths, daysBetween, dayInMonth, monthOf, monthRange, monthsUntil } from './date';
-import { SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
+import { FEE_ID, SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
 
 type BalanceAffecting = Pick<TransactionInput, 'kind' | 'amount' | 'accountId' | 'toAccountId'>;
 
@@ -53,17 +53,22 @@ export interface MonthSummary {
   net: number;
 }
 
-/** 割り勘で受け取ったお金。収入ではなく、立替・割り勘の支出から差し引く */
+/** 割り勘で受け取ったお金 */
 export function isSplitRefund(tx: Pick<Transaction, 'kind' | 'categoryId'>): boolean {
   return tx.kind === 'income' && tx.categoryId === SPLIT_ID;
 }
 
-/** 振替は収支に含めない。割り勘の受け取りは支出から差し引く */
+/** 戻ってきたお金（割り勘の受け取り・手数料の返金）。収入ではなく、そのカテゴリの支出から差し引く */
+export function isRefund(tx: Pick<Transaction, 'kind' | 'categoryId'>): boolean {
+  return tx.kind === 'income' && (tx.categoryId === SPLIT_ID || tx.categoryId === FEE_ID);
+}
+
+/** 振替は収支に含めない。割り勘の受け取り・手数料の返金は支出から差し引く */
 export function summarizeTransactions(txs: Transaction[]): MonthSummary {
   let income = 0;
   let expense = 0;
   for (const tx of txs) {
-    if (isSplitRefund(tx)) expense -= tx.amount;
+    if (isRefund(tx)) expense -= tx.amount;
     else if (tx.kind === 'income') income += tx.amount;
     else if (tx.kind === 'expense') expense += tx.amount;
   }
@@ -79,7 +84,7 @@ export interface CategoryTotal {
 export function expenseByCategory(txs: Transaction[]): CategoryTotal[] {
   const totals = new Map<string | null, number>();
   for (const tx of txs) {
-    const amount = tx.kind === 'expense' ? tx.amount : isSplitRefund(tx) ? -tx.amount : 0;
+    const amount = tx.kind === 'expense' ? tx.amount : isRefund(tx) ? -tx.amount : 0;
     if (amount === 0) continue;
     totals.set(tx.categoryId, (totals.get(tx.categoryId) ?? 0) + amount);
   }
