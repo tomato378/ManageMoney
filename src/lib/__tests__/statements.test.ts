@@ -187,7 +187,14 @@ describe('明細のダウンロード先', () => {
   const { STATEMENT_GUIDES, isValidLink } = jest.requireActual<typeof import('../statementGuides')>('../statementGuides');
   it('取り込める明細ごとに公式サイトの https のリンクがある', () => {
     expect(STATEMENT_GUIDES.map((g) => g.source).sort()).toEqual(['olive-credit', 'paypay', 'saison', 'sbi', 'smbc']);
-    expect(STATEMENT_GUIDES.every((g) => isValidLink(g.url))).toBe(true);
+    expect(STATEMENT_GUIDES.every((g) => isValidLink(g.url) && isValidLink(g.helpUrl))).toBe(true);
+  });
+  it('どの明細も、スマホかパソコンのどちらかに手順がある。できない端末には理由を書く', () => {
+    for (const g of STATEMENT_GUIDES) {
+      const devices = Object.values(g.devices);
+      expect(devices.some((d) => d.steps.length > 0)).toBe(true);
+      for (const d of devices) expect(d.steps.length > 0 || !!d.unavailable).toBe(true);
+    }
   });
   it('自分で入れるリンクは https のページだけ', () => {
     expect(isValidLink('https://example.com/meisai')).toBe(true);
