@@ -13,6 +13,8 @@ export interface DeviceSteps {
   label: string;
   /** この端末ではできない理由。あれば steps は空 */
   unavailable?: string;
+  /** できるけれど、公式にはほかの端末がすすめられている */
+  limited?: boolean;
   /** 押すボタン・選ぶものを順番に */
   steps: string[];
 }
@@ -62,6 +64,7 @@ export const STATEMENT_GUIDES: StatementGuide[] = [
       'ダウンロードできるのは、請求が確定した明細（最大15か月分）です。次の請求分は、請求月の前月18日ごろから出せます',
       '最近使った分は、明細に出るまで2日〜2週間ほどかかります',
       'アプリのバージョンによって、ボタンの場所や名前が少し違うことがあります',
+      'セゾンPortal アプリは iPhone なら iOS 18 以上が必要です。アプリが使えないときは、スマホのブラウザで Netアンサーを開いても同じようにダウンロードできます',
     ],
     helpUrl: 'https://faq.saisoncard.co.jp/saison/detail?site=OA5LHO14&id=1970',
   },
@@ -73,7 +76,7 @@ export const STATEMENT_GUIDES: StatementGuide[] = [
       phone: {
         label: 'スマホ',
         unavailable:
-          '三井住友カードの案内では、明細のCSVはスマホではダウンロードできず、パソコンのブラウザから、となっています。パソコンの手順を見てください。',
+          '三井住友カードの案内では、明細のCSVはスマホではダウンロードできず、パソコンのブラウザから、となっています（Vpass アプリ・Olive アプリでも同じ）。パソコンの手順を見てください。どうしてもスマホでやるなら、Vpass アプリのメニューの「PCサイトを表示する」から試せますが、保存できるかは公式には書かれていません。',
         steps: [],
       },
       pc: {
@@ -99,7 +102,8 @@ export const STATEMENT_GUIDES: StatementGuide[] = [
     summary: '「Webでログイン」→「過去の明細を照会」→ 期間を選んで照会 → CSV でダウンロード',
     devices: {
       phone: {
-        label: 'スマホのブラウザ',
+        label: 'スマホのブラウザ（三井住友銀行アプリではCSVは出せません）',
+        limited: true,
         steps: [
           '「開く」で SMBCダイレクトのページを開き、「Webでログイン」を押す（「アプリでログイン」と出たら「Webでログイン」を選ぶ）',
           '店番号・口座番号（または契約者番号）とログイン暗証でログインする',
@@ -134,7 +138,7 @@ export const STATEMENT_GUIDES: StatementGuide[] = [
       phone: {
         label: 'スマホ',
         unavailable:
-          'SBI新生銀行の案内では、明細の CSV ダウンロードはパソコンだけ、となっています。パソコンの手順を見てください。',
+          'SBI新生銀行の案内では、明細の CSV ダウンロードはパソコンだけ、となっています（SBI新生銀行アプリでは明細を見ることだけできます）。パソコンの手順を見てください。',
         steps: [],
       },
       pc: {
@@ -180,6 +184,12 @@ export const STATEMENT_GUIDES: StatementGuide[] = [
     helpUrl: 'https://paypay.ne.jp/help/c0447/',
   },
 ];
+
+/** その端末でできるか：できる・できるがおすすめしない・できない */
+export function deviceSupport(d: DeviceSteps): 'yes' | 'limited' | 'no' {
+  if (d.unavailable) return 'no';
+  return d.limited ? 'limited' : 'yes';
+}
 
 /** ダウンロードしたあとの共通の手順 */
 export const AFTER_DOWNLOAD: string[] = [

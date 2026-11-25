@@ -196,6 +196,19 @@ describe('明細のダウンロード先', () => {
       for (const d of devices) expect(d.steps.length > 0 || !!d.unavailable).toBe(true);
     }
   });
+  it('スマホ・パソコンでできるか（公式の案内どおり）', () => {
+    const { deviceSupport } = jest.requireActual<typeof import('../statementGuides')>('../statementGuides');
+    const support = Object.fromEntries(
+      STATEMENT_GUIDES.map((g) => [g.source, [deviceSupport(g.devices.phone), deviceSupport(g.devices.pc)]]),
+    );
+    expect(support).toEqual({
+      saison: ['yes', 'yes'],
+      'olive-credit': ['no', 'yes'],
+      smbc: ['limited', 'yes'],
+      sbi: ['no', 'yes'],
+      paypay: ['yes', 'no'],
+    });
+  });
   it('自分で入れるリンクは https のページだけ', () => {
     expect(isValidLink('https://example.com/meisai')).toBe(true);
     expect(isValidLink('http://example.com')).toBe(false);

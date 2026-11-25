@@ -6,6 +6,7 @@ import { updateSettings } from '@/data/repo';
 import { daysBetween, formatDate, today } from '@/lib/date';
 import {
   AFTER_DOWNLOAD,
+  deviceSupport,
   isValidLink,
   STATEMENT_GUIDES,
   type Device,
@@ -81,6 +82,7 @@ function GuideRow({ guide }: { guide: StatementGuide }) {
           <Text style={styles.openText}>開く ↗</Text>
         </Pressable>
       </View>
+      <DeviceBadges guide={guide} />
       <Text style={styles.summary}>{guide.summary}</Text>
       <Pressable onPress={() => setShowSteps(!showSteps)} accessibilityRole="button" style={styles.toggle}>
         <Text style={styles.toggleText}>{showSteps ? '▲ くわしい手順を閉じる' : '▼ くわしい手順を見る'}</Text>
@@ -140,6 +142,28 @@ function Detail({ guide }: { guide: StatementGuide }) {
   );
 }
 
+const SUPPORT_LOOK = {
+  yes: { mark: '○', color: colors.income },
+  limited: { mark: '△', color: colors.warning },
+  no: { mark: '✕', color: colors.danger },
+} as const;
+
+/** スマホ・パソコンでできるか */
+function DeviceBadges({ guide }: { guide: StatementGuide }) {
+  return (
+    <View style={styles.badges}>
+      {(['phone', 'pc'] as const).map((device) => {
+        const look = SUPPORT_LOOK[deviceSupport(guide.devices[device])];
+        return (
+          <Text key={device} style={[styles.badge, { color: look.color, borderColor: look.color }]}>
+            {device === 'phone' ? 'スマホ' : 'パソコン'} {look.mark}
+          </Text>
+        );
+      })}
+    </View>
+  );
+}
+
 /** 番号つきの手順 */
 function Steps({ steps }: { steps: string[] }) {
   return (
@@ -171,6 +195,8 @@ const styles = StyleSheet.create({
   open: { backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   openText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   summary: { fontSize: 13, color: colors.text, lineHeight: 19 },
+  badges: { flexDirection: 'row', gap: spacing.xs },
+  badge: { fontSize: 12, fontWeight: '700', borderWidth: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
   toggle: { paddingVertical: 2 },
   toggleText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
   detail: { gap: spacing.sm, backgroundColor: colors.background, borderRadius: 10, padding: spacing.md },
