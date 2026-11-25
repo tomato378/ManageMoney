@@ -93,6 +93,10 @@ export interface AppSettings {
   otherPeople: string[];
   /** 振込先・店ごとに覚えたカテゴリ。キーは「支出か収入:振込先」 */
   payeeCategories: Record<string, string>;
+  /** 明細をダウンロードしに行くページを自分で変えたもの */
+  statementLinks: Partial<Record<StatementSource, string>>;
+  /** 明細の種類ごとに、最後に取り込んだ日（YYYY-MM-DD） */
+  lastImportedAt: Partial<Record<StatementSource, string>>;
   /** 口座ごとに、最後に残高が正しいと確かめた日（残高チェック・残高つき明細の取り込み）。YYYY-MM-DD */
   confirmedAt: Record<string, string>;
 }

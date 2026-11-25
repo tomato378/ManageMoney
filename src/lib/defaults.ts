@@ -48,6 +48,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   statementAccountIds: {},
   otherPeople: [],
   payeeCategories: {},
+  statementLinks: {},
+  lastImportedAt: {},
   confirmedAt: {},
 };
 

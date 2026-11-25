@@ -140,6 +140,7 @@ export function importStatement(
     next = state.updateSettings(next, {
       statementAccountIds: { ...next.settings.statementAccountIds, ...sources },
       otherPeople: [...others],
+      lastImportedAt: { ...next.settings.lastImportedAt, [statement.source]: today() },
     });
     const imported = importRows(next, statement, map, Date.now(), next.settings.otherPeople);
     result = imported.result;

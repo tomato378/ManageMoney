@@ -20,6 +20,7 @@ import {
 } from '@/lib/statements';
 import type { StatementSource } from '@/types';
 import { Button, Card, Chip, ChipRow, Screen, SectionTitle } from '@/ui/components';
+import { StatementLinks } from '@/ui/StatementLinks';
 import { colors, spacing } from '@/ui/theme';
 
 interface LoadedFile {
@@ -50,6 +51,7 @@ export default function ImportScreen() {
 
   return (
     <Screen>
+      <StatementLinks />
       <Card>
         <Text style={styles.caption}>
           カード会社・銀行・PayPay のアプリやサイトからダウンロードした明細のCSVファイルを選んでください。何枚でもまとめて選べます。同じファイルを2回取り込んでも、二重には記録されません。

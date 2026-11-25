@@ -57,6 +57,8 @@ export function seedData(): AppData {
       statementAccountIds: {},
       otherPeople: [],
       payeeCategories: {},
+      statementLinks: {},
+      lastImportedAt: {},
       confirmedAt: {},
     },
   };

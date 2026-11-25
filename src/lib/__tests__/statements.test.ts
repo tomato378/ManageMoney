@@ -182,3 +182,17 @@ describe('SBI新生銀行', () => {
     expect(guessAccount('self-bank', accounts, settings, 'smbc')).toBe('sbi');
   });
 });
+
+describe('明細のダウンロード先', () => {
+  const { STATEMENT_GUIDES, isValidLink } = jest.requireActual<typeof import('../statementGuides')>('../statementGuides');
+  it('取り込める明細ごとに公式サイトの https のリンクがある', () => {
+    expect(STATEMENT_GUIDES.map((g) => g.source).sort()).toEqual(['olive-credit', 'paypay', 'saison', 'sbi', 'smbc']);
+    expect(STATEMENT_GUIDES.every((g) => isValidLink(g.url))).toBe(true);
+  });
+  it('自分で入れるリンクは https のページだけ', () => {
+    expect(isValidLink('https://example.com/meisai')).toBe(true);
+    expect(isValidLink('http://example.com')).toBe(false);
+    expect(isValidLink('javascript:alert(1)')).toBe(false);
+    expect(isValidLink('aaa')).toBe(false);
+  });
+});

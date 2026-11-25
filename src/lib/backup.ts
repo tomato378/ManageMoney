@@ -61,6 +61,8 @@ export function normalizeData(value: unknown): AppData | null {
       confirmedAt: isObject(settings.confirmedAt) ? settings.confirmedAt : {},
       otherPeople: Array.isArray(settings.otherPeople) ? settings.otherPeople : [],
       payeeCategories: isObject(settings.payeeCategories) ? settings.payeeCategories : {},
+      statementLinks: isObject(settings.statementLinks) ? settings.statementLinks : {},
+      lastImportedAt: isObject(settings.lastImportedAt) ? settings.lastImportedAt : {},
     } as AppData['settings'],
   };
 }
