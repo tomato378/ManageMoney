@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useData } from '@/data/DataProvider';
 import { reconcileBalances } from '@/data/repo';
 import { formatDate, today } from '@/lib/date';
+import { isInvestmentAccount } from '@/lib/calc';
 import { accountTypeLabel } from '@/lib/defaults';
 import { formatYen, parseAmount } from '@/lib/money';
 import type { Account } from '@/types';
@@ -41,7 +42,10 @@ export default function BalanceCheckScreen() {
   const entered = accounts.filter((a) => actuals[a.id] !== undefined);
   // 初めて確かめる口座は差を記録しない（記録を始める前の分なので）
   const isFirst = (id: string) => !settings.confirmedAt[id];
-  const totalDiff = entered.filter((a) => !isFirst(a.id)).reduce((sum, a) => sum + (actuals[a.id] - a.balance), 0);
+  // 定期預金などの増減は使途不明金ではなく「運用の増減」なので、合計のずれに入れない
+  const totalDiff = entered
+    .filter((a) => !isFirst(a.id) && !isInvestmentAccount(a))
+    .reduce((sum, a) => sum + (actuals[a.id] - a.balance), 0);
 
   async function confirm() {
     const message =
@@ -93,6 +97,10 @@ export default function BalanceCheckScreen() {
               />
               {diff !== null && isFirst(a.id) ? (
                 <Text style={styles.first}>初めての確認なので、ずれは記録せずにこの残高から始めます</Text>
+              ) : diff !== null && isInvestmentAccount(a) ? (
+                <Text style={styles.first}>
+                  {diff === 0 ? '増減なし' : `運用の増減 ${diff > 0 ? '+' : '-'}${formatYen(Math.abs(diff))} として記録します（収支には入れません）`}
+                </Text>
               ) : diff !== null ? (
                 <Text style={[styles.diff, { color: diff === 0 ? colors.income : colors.warning }]}>
                   {diffText(diff, a.type === 'credit')}

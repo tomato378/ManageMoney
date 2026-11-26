@@ -59,6 +59,17 @@ describe('残高チェック', () => {
     expect(second.transactions).toEqual([expect.objectContaining({ kind: 'expense', amount: 300, categoryId: 'unknown' })]);
   });
 
+  it('定期預金の増減は、使途不明金ではなく運用の増減にする（ほかの口座とも相殺しない）', () => {
+    let d = saveAccount(withAccounts(), { id: 'sav', name: '定期', type: 'deposit', balance: 300000, sortOrder: 3, archived: false });
+    d = { ...d, settings: { ...d.settings, confirmedAt: { ...d.settings.confirmedAt, sav: '2026-10-01' } } };
+    const data = reconcileBalances(d, { sav: 300604, cash: 9396 }, '2026-11-07');
+    expect(balanceOf(data, 'sav')).toBe(300604);
+    expect(data.transactions.map((t) => [t.kind, t.amount, t.accountId, t.categoryId])).toEqual([
+      ['expense', 604, 'cash', 'unknown'],
+      ['income', 604, 'sav', 'invest-gain'],
+    ]);
+  });
+
   it('何も入力しなければ何も変えない', () => {
     const before = withAccounts();
     expect(reconcileBalances(before, {}, '2026-11-07')).toBe(before);

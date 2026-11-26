@@ -7,6 +7,7 @@ import { useData, useMonthTransactions } from '@/data/DataProvider';
 import {
   assetHistory,
   expenseOfCategory,
+  investmentSummaries,
   isSplitRefund,
   smallSpending,
   spendingPace,
@@ -33,6 +34,10 @@ export default function HomeScreen() {
   const coverage = useMemo(() => statementCoverage(accounts, transactions), [accounts, transactions]);
   const judgeDate = coverage && coverage < addDays(todayDate, -7) ? coverage : todayDate;
   const pace = useMemo(() => spendingPace(transactions, judgeDate), [transactions, judgeDate]);
+  const investments = useMemo(
+    () => investmentSummaries(accounts, transactions, thisMonth),
+    [accounts, transactions, thisMonth],
+  );
   const small = useMemo(() => smallSpending(transactions, todayDate), [transactions, todayDate]);
   const stale = staleAccounts(accounts, settings.confirmedAt, todayDate);
   const thisMonthSummary = summarizeTransactions(thisMonthTxs);
@@ -53,6 +58,24 @@ export default function HomeScreen() {
     <View style={styles.flex}>
       <Screen>
         <Verdict pace={pace} total={totalAssets(accounts)} asOf={judgeDate === todayDate ? null : judgeDate} />
+
+        {investments.length > 0 ? (
+          <Pressable
+            onPress={() => router.push('/investments')}
+            style={styles.invest}
+            accessibilityRole="button"
+            accessibilityLabel="預金・運用を見る"
+          >
+            <Text style={styles.investText}>
+              💹 預金・運用 {formatYen(investments.reduce((s, x) => s + x.account.balance, 0))}
+              {(() => {
+                const g = investments.reduce((s, x) => s + x.gain, 0);
+                return g === 0 ? '' : `（今月 ${g > 0 ? '+' : '-'}${formatYen(Math.abs(g))}）`;
+              })()}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.subText} />
+          </Pressable>
+        ) : null}
 
         {!isNew ? (
           <Card>
@@ -296,6 +319,8 @@ const styles = StyleSheet.create({
   verdictTitle: { fontSize: 26, fontWeight: '800' },
   verdictText: { fontSize: 15, color: colors.text, lineHeight: 22 },
   verdictSub: { fontSize: 13, color: colors.subText },
+  invest: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: spacing.xs },
+  investText: { fontSize: 13, color: colors.subText },
   insight: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', paddingVertical: spacing.xs },
   insightText: { fontSize: 15, fontWeight: '600', color: colors.text },
   insightSub: { fontSize: 12, color: colors.subText, lineHeight: 18 },

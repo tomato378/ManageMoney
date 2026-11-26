@@ -57,7 +57,22 @@ describe('古いデータの読み込み', () => {
     const data = normalizeData(old)!;
     expect(data.recurring).toEqual([]);
     expect(data.balanceChecks).toEqual([]);
-    expect(data.categories.map((c) => c.id)).toEqual(['food', 'unknown', 'split', 'fee', 'special', 'unknown-income']);
+    expect(data.categories.map((c) => c.id)).toEqual(['food', 'unknown', 'split', 'fee', 'special', 'parent-expense', 'invest-loss', 'unknown-income', 'parent-income', 'invest-gain']);
     expect(data.settings.paymentAccountIds).toEqual({ cash: 'cash', credit: null, emoney: null });
   });
+});
+
+it('以前の取り込みで銀行として作った定期預金の口座は、定期預金の種類に直す', () => {
+  const old = {
+    accounts: [
+      { id: 'sav', name: '定期預金', type: 'bank', balance: 0, sortOrder: 0, archived: false },
+      { id: 'b', name: '銀行', type: 'bank', balance: 0, sortOrder: 1, archived: false },
+    ],
+    categories: [],
+    transactions: [],
+    budgets: [],
+    goals: [],
+    settings: { statementAccountIds: { savings: 'sav' } },
+  };
+  expect(normalizeData(old)!.accounts.map((a) => a.type)).toEqual(['deposit', 'bank']);
 });

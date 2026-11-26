@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="scan" options={{ title: 'レシートをまとめて撮る' }} />
         <Stack.Screen name="balance-check" options={{ title: '残高チェック' }} />
         <Stack.Screen name="import" options={{ title: '明細を取り込む' }} />
+        <Stack.Screen name="investments" options={{ title: '預金・運用' }} />
         <Stack.Screen name="recurring/[id]" options={{ title: '毎月の収入・固定費' }} />
       </Stack>
     </DataProvider>

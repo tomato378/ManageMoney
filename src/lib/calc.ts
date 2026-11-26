@@ -1,6 +1,15 @@
 import type { Account, AccountType, Budget, Category, Goal, Transaction, TransactionInput } from '@/types';
 import { addMonths, daysBetween, dayInMonth, monthOf, monthRange, monthsUntil } from './date';
-import { FEE_ID, SPECIAL_ID, SPLIT_ID, UNKNOWN_EXPENSE_ID } from './defaults';
+import {
+  EXCLUDED_CATEGORY_IDS,
+  FEE_ID,
+  INVEST_GAIN_ID,
+  INVEST_LOSS_ID,
+  INVESTMENT_ACCOUNT_TYPES,
+  SPECIAL_ID,
+  SPLIT_ID,
+  UNKNOWN_EXPENSE_ID,
+} from './defaults';
 
 type BalanceAffecting = Pick<TransactionInput, 'kind' | 'amount' | 'accountId' | 'toAccountId'>;
 
@@ -63,11 +72,20 @@ export function isRefund(tx: Pick<Transaction, 'kind' | 'categoryId'>): boolean 
   return tx.kind === 'income' && (tx.categoryId === SPLIT_ID || tx.categoryId === FEE_ID);
 }
 
-/** 振替は収支に含めない。割り勘の受け取り・手数料の返金は支出から差し引く */
+/** 収支に入れない取引（親のお金・運用の増減） */
+export function isExcluded(tx: Pick<Transaction, 'categoryId'>): boolean {
+  return !!tx.categoryId && EXCLUDED_CATEGORY_IDS.includes(tx.categoryId);
+}
+
+/**
+ * 振替は収支に含めない。割り勘の受け取り・手数料の返金は支出から差し引く。
+ * 親のお金・運用の増減は自分の収支ではないので入れない
+ */
 export function summarizeTransactions(txs: Transaction[]): MonthSummary {
   let income = 0;
   let expense = 0;
   for (const tx of txs) {
+    if (isExcluded(tx)) continue;
     if (isRefund(tx)) expense -= tx.amount;
     else if (tx.kind === 'income') income += tx.amount;
     else if (tx.kind === 'expense') expense += tx.amount;
@@ -84,6 +102,7 @@ export interface CategoryTotal {
 export function expenseByCategory(txs: Transaction[]): CategoryTotal[] {
   const totals = new Map<string | null, number>();
   for (const tx of txs) {
+    if (isExcluded(tx)) continue;
     const amount = tx.kind === 'expense' ? tx.amount : isRefund(tx) ? -tx.amount : 0;
     if (amount === 0) continue;
     totals.set(tx.categoryId, (totals.get(tx.categoryId) ?? 0) + amount);
@@ -256,7 +275,11 @@ export function spendingPace(txs: Transaction[], today: string, months = 3): Spe
 /** 割り勘・使途不明金をのぞいた、ふつうの買い物の支出 */
 function isPurchase(t: Transaction): boolean {
   return (
-    t.kind === 'expense' && t.categoryId !== SPLIT_ID && t.categoryId !== UNKNOWN_EXPENSE_ID && t.categoryId !== SPECIAL_ID
+    t.kind === 'expense' &&
+    !isExcluded(t) &&
+    t.categoryId !== SPLIT_ID &&
+    t.categoryId !== UNKNOWN_EXPENSE_ID &&
+    t.categoryId !== SPECIAL_ID
   );
 }
 
@@ -319,4 +342,34 @@ export function statementCoverage(accounts: Account[], txs: Transaction[]): stri
   }
   if (latest.size === 0) return null;
   return [...latest.values()].sort()[0];
+}
+
+export function isInvestmentAccount(account: Pick<Account, 'type'>): boolean {
+  return INVESTMENT_ACCOUNT_TYPES.includes(account.type);
+}
+
+export interface InvestmentSummary {
+  account: Account;
+  /** 期間中の増減（利息・値上がり − 値下がり） */
+  gain: number;
+  /** 記録を始めてからの増減の合計 */
+  totalGain: number;
+}
+
+/** 運用の増減（残高チェックで記録したもの）の合計。プラスが増えた分 */
+function gainOf(txs: Transaction[]): number {
+  return txs.reduce(
+    (sum, t) => sum + (t.categoryId === INVEST_GAIN_ID ? t.amount : t.categoryId === INVEST_LOSS_ID ? -t.amount : 0),
+    0,
+  );
+}
+
+/** 預金・運用の口座ごとの残高と増減（month は YYYY-MM） */
+export function investmentSummaries(accounts: Account[], txs: Transaction[], month: string): InvestmentSummary[] {
+  return activeAccounts(accounts)
+    .filter(isInvestmentAccount)
+    .map((account) => {
+      const own = txs.filter((t) => t.accountId === account.id);
+      return { account, gain: gainOf(own.filter((t) => monthOf(t.date) === month)), totalGain: gainOf(own) };
+    });
 }

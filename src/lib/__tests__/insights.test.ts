@@ -1,5 +1,12 @@
 import type { Account, Transaction } from '@/types';
-import { smallSpending, spendingPace, staleAccounts, statementCoverage, summarizeTransactions } from '../calc';
+import {
+  investmentSummaries,
+  smallSpending,
+  spendingPace,
+  staleAccounts,
+  statementCoverage,
+  summarizeTransactions,
+} from '../calc';
 
 let n = 0;
 const tx = (date: string, amount: number, kind: Transaction['kind'] = 'expense', categoryId: string | null = 'food'): Transaction => ({
@@ -16,6 +23,27 @@ describe('割り勘', () => {
 
 it('振込手数料の返金も支出から差し引く', () => {
   expect(summarizeTransactions([tx('2026-11-01', 75, 'expense', 'fee'), tx('2026-11-01', 75, 'income', 'fee')]).expense).toBe(0);
+});
+
+it('親のお金・運用の増減は収支に入れない', () => {
+  const txs = [
+    tx('2026-10-15', 702000, 'expense', 'parent-expense'),
+    tx('2026-10-01', 300000, 'income', 'parent-income'),
+    tx('2026-10-10', 604, 'income', 'invest-gain'),
+    tx('2026-10-11', 1000),
+  ];
+  expect(summarizeTransactions(txs)).toEqual({ income: 0, expense: 1000, net: -1000 });
+});
+
+it('預金・運用の口座ごとの増減', () => {
+  const sav: Account = { id: 'sav', name: '定期', type: 'deposit', balance: 300604, sortOrder: 0, archived: false };
+  const bank: Account = { id: 'b', name: '銀行', type: 'bank', balance: 1000, sortOrder: 1, archived: false };
+  const gain = (date: string, amount: number, kind: 'income' | 'expense') => ({
+    ...tx(date, amount, kind, kind === 'income' ? 'invest-gain' : 'invest-loss'),
+    accountId: 'sav',
+  });
+  const txs = [gain('2026-10-31', 500, 'income'), gain('2026-11-30', 604, 'income'), gain('2026-11-30', 100, 'expense')];
+  expect(investmentSummaries([sav, bank], txs, '2026-11')).toEqual([{ account: sav, gain: 504, totalGain: 1004 }]);
 });
 
 describe('いつもの月との比較', () => {

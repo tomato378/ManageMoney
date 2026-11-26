@@ -3,6 +3,10 @@ import {
   DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS,
   FEE_ID,
+  INVEST_GAIN_ID,
+  INVEST_LOSS_ID,
+  PARENT_EXPENSE_ID,
+  PARENT_INCOME_ID,
   SPECIAL_ID,
   SPLIT_ID,
   UNKNOWN_EXPENSE_ID,
@@ -29,7 +33,17 @@ function isObject(value: unknown): value is Record<string, unknown> {
 const OPTIONAL_LIST_KEYS = ['recurring', 'balanceChecks'] as const;
 
 /** 残高チェックに必要なので、古いデータにもなければ足すカテゴリ */
-const REQUIRED_CATEGORY_IDS = [UNKNOWN_EXPENSE_ID, UNKNOWN_INCOME_ID, SPLIT_ID, FEE_ID, SPECIAL_ID];
+const REQUIRED_CATEGORY_IDS = [
+  UNKNOWN_EXPENSE_ID,
+  UNKNOWN_INCOME_ID,
+  SPLIT_ID,
+  FEE_ID,
+  SPECIAL_ID,
+  PARENT_EXPENSE_ID,
+  PARENT_INCOME_ID,
+  INVEST_GAIN_ID,
+  INVEST_LOSS_ID,
+];
 
 /**
  * 保存データ・バックアップの中身として形が正しければ AppData に整えて返す。
@@ -45,8 +59,13 @@ export function normalizeData(value: unknown): AppData | null {
     (c) => REQUIRED_CATEGORY_IDS.includes(c.id) && !categories.some((existing) => existing.id === c.id),
   ).map((c) => ({ ...c }));
   const [recurring, balanceChecks] = OPTIONAL_LIST_KEYS.map((key) => (Array.isArray(value[key]) ? value[key] : []));
+  // 以前の取り込みで「銀行」として作った定期預金の口座は、定期預金の種類に直す
+  const savingsId = isObject(settings.statementAccountIds) ? settings.statementAccountIds.savings : undefined;
+  const accounts = (value.accounts as AppData['accounts']).map((a) =>
+    a.id === savingsId && a.type === 'bank' ? { ...a, type: 'deposit' as const } : a,
+  );
   return {
-    accounts: value.accounts as AppData['accounts'],
+    accounts,
     categories: [...categories, ...missingCategories],
     transactions: value.transactions as AppData['transactions'],
     budgets: value.budgets as AppData['budgets'],

@@ -5,6 +5,9 @@ import {
   DEFAULT_ACCOUNT,
   DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS,
+  INVEST_GAIN_ID,
+  INVEST_LOSS_ID,
+  INVESTMENT_ACCOUNT_TYPES,
   SPECIAL_ID,
   UNKNOWN_EXPENSE_ID,
   UNKNOWN_INCOME_ID,
@@ -184,6 +187,7 @@ export function reconcileBalances(
   // 一度も残高を確かめていない口座は、記録との差に意味がない（記録を始める前の動きの分）。
   // 初回は差を記録せずに今の残高にそろえ、そこを起点にする
   const firstTime = new Set<string>();
+  const investDiffs: { accountId: string; amount: number }[] = [];
   for (const account of data.accounts) {
     const actual = actuals[account.id];
     if (actual === undefined || account.archived) continue;
@@ -193,6 +197,11 @@ export function reconcileBalances(
       continue;
     }
     const diff = actual - account.balance;
+    // 定期預金・証券などの増減は利息・値動きなので、使途不明金ではなく「運用の増減」にする
+    if (INVESTMENT_ACCOUNT_TYPES.includes(account.type)) {
+      if (diff !== 0) investDiffs.push({ accountId: account.id, amount: diff });
+      continue;
+    }
     if (diff > 0) surplus.push({ accountId: account.id, amount: diff });
     if (diff < 0) shortage.push({ accountId: account.id, amount: -diff });
   }
@@ -218,6 +227,16 @@ export function reconcileBalances(
   }
   for (const s of shortage.slice(j)) {
     if (s.amount > 0) inputs.push({ ...base, kind: 'expense', amount: s.amount, accountId: s.accountId, categoryId: UNKNOWN_EXPENSE_ID });
+  }
+  for (const d of investDiffs) {
+    inputs.push({
+      ...base,
+      memo: '残高チェックで記録した運用の増減',
+      kind: d.amount > 0 ? 'income' : 'expense',
+      amount: Math.abs(d.amount),
+      accountId: d.accountId,
+      categoryId: d.amount > 0 ? INVEST_GAIN_ID : INVEST_LOSS_ID,
+    });
   }
 
   const baselined = {

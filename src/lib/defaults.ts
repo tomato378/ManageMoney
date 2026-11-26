@@ -9,6 +9,18 @@ export const SPLIT_ID = 'split';
 export const FEE_ID = 'fee';
 /** 学費・家電など、めったにない大きな出費。「いつもの月」との比較には入れない */
 export const SPECIAL_ID = 'special';
+/** 親のお金で払ったもの（学費など）・親からもらったお金。自分の収支に入れない */
+export const PARENT_EXPENSE_ID = 'parent-expense';
+export const PARENT_INCOME_ID = 'parent-income';
+/** 定期預金・証券などの増減（利息・値上がり）。収支とは別に見る */
+export const INVEST_GAIN_ID = 'invest-gain';
+export const INVEST_LOSS_ID = 'invest-loss';
+
+/** 収入・支出・内訳・判定に入れないカテゴリ */
+export const EXCLUDED_CATEGORY_IDS: readonly string[] = [PARENT_EXPENSE_ID, PARENT_INCOME_ID, INVEST_GAIN_ID, INVEST_LOSS_ID];
+
+/** 預金・運用の口座（収支とは別に増減を見る） */
+export const INVESTMENT_ACCOUNT_TYPES: readonly AccountType[] = ['deposit', 'securities', 'crypto'];
 
 /** 初回に作るカテゴリ。ID を固定して二重作成を防ぐ */
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -26,10 +38,14 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: SPLIT_ID, name: '立替・割り勘', kind: 'expense', icon: 'people', color: '#F472B6', sortOrder: 11 },
   { id: FEE_ID, name: '手数料', kind: 'expense', icon: 'cash', color: '#78716C', sortOrder: 12 },
   { id: SPECIAL_ID, name: '特別な出費', kind: 'expense', icon: 'star', color: '#0F766E', sortOrder: 13 },
+  { id: PARENT_EXPENSE_ID, name: '親のお金で払った（学費など）', kind: 'expense', icon: 'school', color: '#64748B', sortOrder: 14 },
+  { id: INVEST_LOSS_ID, name: '運用の増減', kind: 'expense', icon: 'trending-down', color: '#0891B2', sortOrder: 15 },
   { id: 'salary', name: '給与', kind: 'income', icon: 'cash', color: '#16A34A', sortOrder: 0 },
   { id: 'side-job', name: '副業', kind: 'income', icon: 'briefcase', color: '#0EA5E9', sortOrder: 1 },
   { id: 'other-income', name: 'その他収入', kind: 'income', icon: 'gift', color: '#84CC16', sortOrder: 2 },
   { id: UNKNOWN_INCOME_ID, name: '使途不明の収入', kind: 'income', icon: 'help-circle', color: '#9CA3AF', sortOrder: 3 },
+  { id: PARENT_INCOME_ID, name: '親からのお金', kind: 'income', icon: 'home', color: '#64748B', sortOrder: 4 },
+  { id: INVEST_GAIN_ID, name: '運用の増減', kind: 'income', icon: 'trending-up', color: '#0891B2', sortOrder: 5 },
 ];
 
 export const DEFAULT_ACCOUNT: Account = {
@@ -57,6 +73,7 @@ export const ACCOUNT_TYPES: { type: AccountType; label: string; icon: string }[]
   { type: 'bank', label: '銀行', icon: 'business' },
   { type: 'cash', label: '現金', icon: 'wallet' },
   { type: 'emoney', label: '電子マネー', icon: 'phone-portrait' },
+  { type: 'deposit', label: '定期預金', icon: 'lock-closed' },
   { type: 'securities', label: '証券', icon: 'trending-up' },
   { type: 'crypto', label: '暗号資産', icon: 'logo-bitcoin' },
   { type: 'credit', label: 'クレカ', icon: 'card' },

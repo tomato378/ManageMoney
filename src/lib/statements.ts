@@ -376,7 +376,7 @@ export function neededAccounts(statement: Statement): Counterpart[] {
 export const NEW_ACCOUNT_FOR: Record<Counterpart, { name: string; type: AccountType }> = {
   cash: { name: '財布', type: 'cash' },
   'self-bank': { name: '別の銀行口座', type: 'bank' },
-  savings: { name: '定期預金', type: 'bank' },
+  savings: { name: '定期預金', type: 'deposit' },
   saison: { name: 'セゾンカード', type: 'credit' },
   'olive-credit': { name: 'Olive クレジット', type: 'credit' },
   smbc: { name: '三井住友銀行', type: 'bank' },
